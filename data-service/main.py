@@ -350,7 +350,6 @@ async def get_chats(source_name: str):
             {"source_name": source_name}, 
             {"_id": 0, "chat_id": 1, "chat_name": 1}
         ))
-        
         return {"chats": chats}
     except HTTPException as he:
         raise he
@@ -416,7 +415,7 @@ async def get_processed_messages(chat_id: str):
         # Query messages for the given chat_id
         messages = list(processed_messages.find(
             {"chat_id": chat_id},
-            {"_id": 0, "sender": 1, "text": 1, "type": 1, "data": 1}
+            {"_id": 0, "chat_id":1, "source_name":1, "sender": 1, "text": 1, "type": 1, "data": 1}
         ).sort("timestamp", 1))
         
         return messages
