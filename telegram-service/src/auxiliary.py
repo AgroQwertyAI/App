@@ -8,13 +8,15 @@ logger = logging.getLogger(__name__)
 
 async def get_active_chats() -> list[str]:
     logger.info(f"Fetching active chats from {data_service_url}")
-    url = f"{data_service_url}/get_active_chats?source_name=telegram"
+    url = f"{data_service_url}/api/chats?source_name=telegram"
     async with aiohttp.ClientSession() as session:
         async with session.get(url) as response:
             if response.status == 200:
                 data = await response.json()
-                active_chats = data.get("active_chats", [])
-                logger.info(f"Fetched active chats")
+                chats = data.get("chats", [])
+                # Filter to only include active chats and extract chat IDs
+                active_chats = [str(chat["chat_id"]) for chat in chats if chat.get("active", False)]
+                logger.info(f"Fetched {len(active_chats)} active chats")
                 return active_chats
             else:
                 raise Exception(f"Failed to fetch active chats, status code: {response.status}")
@@ -52,7 +54,7 @@ async def register_chat(chat_registration: ChatRegistrationSchema) -> None:
                 logger.info("Chat registered successfully.")
 
 
-async def unregister_chat(chat_id: int) -> None:
+async def unregister_chat(chat_id: str) -> None:
     logger.info(f"Unregistering chat {chat_id}")
     async with aiohttp.ClientSession() as session:
         async with session.delete(f"{data_service_url}/api/chats/{chat_id}") as resp:

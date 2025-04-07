@@ -28,7 +28,8 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
 
         active_chats = await get_active_chats()
-        if message.chat_id not in active_chats:
+        
+        if str(message.chat_id) not in active_chats:
             logger.info(f"Chat id {message.chat_id} is not active. Skipping message.")
             return
         
@@ -44,11 +45,14 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         sender_name = sender.username if sender and sender.username else\
             (sender.first_name if sender and sender.first_name else "")
 
+        print(chat_id, text, sender_id, sender_name, image_blob)
+
         payload = MessagePayload(
+            message_id=str(message.message_id),
             source_name="telegram", 
-            chat_id=chat_id, 
+            chat_id=str(chat_id), 
             text=text, 
-            sender_id=sender_id, 
+            sender_id=str(sender_id), 
             sender_name=sender_name, 
             image=image_blob
         )
@@ -68,7 +72,7 @@ async def chat_member_join_handler(update: Update, context: ContextTypes.DEFAULT
         chat_id = chat.id
         chat_name = chat.title if getattr(chat, 'title', None) else 'Unknown Group'
 
-        chat_registration = ChatRegistrationSchema(chat_id=chat_id, chat_name=chat_name)
+        chat_registration = ChatRegistrationSchema(chat_id=str(chat_id), chat_name=chat_name)
         await register_chat(chat_registration)
     except Exception as e:
         logger.error(f"Error in chat_member_handler: {e}")
@@ -83,7 +87,7 @@ async def chat_member_left_handler(update: Update, context: ContextTypes.DEFAULT
         chat = update.my_chat_member.chat
         chat_id = chat.id
 
-        await unregister_chat(chat_id)
+        await unregister_chat(str(chat_id))
     except Exception as e:
         logger.error(f"Error in chat_member_left_handler: {e}")
 
