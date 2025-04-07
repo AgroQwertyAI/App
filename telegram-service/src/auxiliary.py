@@ -1,7 +1,7 @@
 import aiohttp
 import logging
-from config import data_service_url, message_handler_url
-from schemas import MessagePayload, ChatRegistrationSchema
+from src.config import data_service_url, message_handler_url
+from src.schemas import MessagePayload, ChatRegistrationSchema
 import base64
 
 logger = logging.getLogger(__name__)

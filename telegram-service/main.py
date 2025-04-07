@@ -1,9 +1,9 @@
 import logging
 from telegram import Update
 from telegram.ext import Application, MessageHandler, filters, ContextTypes, ChatMemberHandler
-from schemas import MessagePayload, ChatRegistrationSchema
+from src.schemas import MessagePayload, ChatRegistrationSchema
 import asyncio
-from auxiliary import (
+from src.auxiliary import (
     get_active_chats, 
     send_new_message, 
     register_chat, 
