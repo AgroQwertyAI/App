@@ -26,7 +26,7 @@ load_dotenv()
 # Configuration constants
 API_PORT = int(os.getenv("API_PORT", 52003))
 DATA_SERVICE_HOST = os.getenv("DATA_SERVICE_HOST", "localhost")
-DATA_SERVICE_PORT = int(os.getenv("DATA_SERVICE_PORT", 52001))
+DATA_SERVICE_PORT = int(os.getenv("DATA_SERVICE_PORT", 3000))
 DATA_SERVICE_URL = f"http://{DATA_SERVICE_HOST}:{DATA_SERVICE_PORT}"
 
 # FastAPI initialization
@@ -55,7 +55,7 @@ async def fetch_data_service(url: str) -> dict:
 
 async def fetch_processed_messages(chat_id: str) -> List[Dict[str, Any]]:
     """Gets processed messages for the specified chat_id."""
-    url = f"{DATA_SERVICE_URL}/get_processed_messages/{chat_id}"
+    url = f"{DATA_SERVICE_URL}/api/chats/messages/{chat_id}"
     data = await fetch_data_service(url)
 
     if not isinstance(data, list):
