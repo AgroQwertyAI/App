@@ -2,14 +2,12 @@ import logging
 from telegram import Update
 from telegram.ext import Application, MessageHandler, filters, ContextTypes, ChatMemberHandler
 from src.schemas import MessagePayload, ChatRegistrationSchema
-import asyncio
 from src.auxiliary import (
     get_active_chats, 
     send_new_message, 
     register_chat, 
     unregister_chat,
     get_blob_photo,
-    get_telegram_api_key
 )
 
 logging.basicConfig(level=logging.INFO)
@@ -91,8 +89,10 @@ async def chat_member_left_handler(update: Update, context: ContextTypes.DEFAULT
     except Exception as e:
         logger.error(f"Error in chat_member_left_handler: {e}")
 
-async def start_telegram_app():
-    token = await get_telegram_api_key()
+
+if __name__ == "__main__":
+    #token = os.environ["TELEGRAM_API_KEY"]
+    token = "7667447561:AAGBrVzUNsGOdgVohYyiqOSf1P6EM6H4M-8"
     
     app = Application.builder().token(token).build()
     # Register the handler for text and photo messages
@@ -102,16 +102,4 @@ async def start_telegram_app():
     # Register handler for bot left the group
     app.add_handler(ChatMemberHandler(chat_member_left_handler, ChatMemberHandler.MY_CHAT_MEMBER))
 
-    await app.initialize()
-    await app.start()
-    try:
-        await app.updater.start_polling()  # If you're using Updater
-
-        while True:
-            await asyncio.sleep(1)
-    finally:
-        await app.stop()
-        await app.shutdown()
-
-if __name__ == "__main__":
-    asyncio.run(start_telegram_app())
+    app.run_polling()

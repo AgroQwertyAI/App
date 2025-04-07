@@ -20,25 +20,6 @@ async def get_active_chats() -> list[str]:
                 return active_chats
             else:
                 raise Exception(f"Failed to fetch active chats, status code: {response.status}")
-
-
-async def get_telegram_api_key() -> str:
-    logger.info(f"Fetching telegram API key from {data_service_url}")
-    #MOCK
-    return "7667447561:AAGBrVzUNsGOdgVohYyiqOSf1P6EM6H4M-8"
-    #MOCK
-    url = f"{data_service_url}/get_telegram_api_key?source_name=telegram"
-    async with aiohttp.ClientSession() as session:
-        async with session.get(url) as response:
-            if response.status == 200:
-                data = await response.json()
-                telegram_api_key = data.get("telegram_api_key")
-                if telegram_api_key:
-                    logger.info(f"Fetched telegram API key")
-                    return telegram_api_key
-                raise Exception("telegram_api_key not found in response.")
-            else:
-                raise Exception(f"Failed to fetch telegram API key, status code: {response.status}")
             
 
 async def register_chat(chat_registration: ChatRegistrationSchema) -> None:
