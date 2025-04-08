@@ -10,13 +10,13 @@ import pandas as pd
 from fastapi import FastAPI, HTTPException
 from dotenv import load_dotenv
 
-from models import TableRequest, ChartRequest, ChartResponse
-from table_generators import (
+from src.models import TableRequest, ChartRequest, ChartResponse
+from src.table_generators import (
     create_dataframe_from_mapping,
     generate_table_response,
     TableFormat
 )
-from chart_generators import generate_chart_data_from_mapping
+from src.chart_generators import generate_chart_data_from_mapping
 
 # Set locale for date formatting
 locale.setlocale(locale.LC_ALL, 'ru_RU.UTF-8')
