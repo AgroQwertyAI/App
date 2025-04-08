@@ -1,21 +1,25 @@
 import os
+import locale
 import logging
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
+from datetime import datetime
 
 import uvicorn
 import aiohttp
 import pandas as pd
-from fastapi import FastAPI, HTTPException, Query
-from fastapi.responses import Response
+from fastapi import FastAPI, HTTPException
 from dotenv import load_dotenv
 
-from generators import (
-    create_dataframe,
+from models import TableRequest, ChartRequest, ChartResponse
+from table_generators import (
+    create_dataframe_from_mapping,
     generate_table_response,
-    generate_chart_data,
     TableFormat
 )
+from chart_generators import generate_chart_data_from_mapping
 
+# Set locale for date formatting
+locale.setlocale(locale.LC_ALL, 'ru_RU.UTF-8')
 # Logging setup, will be replaced with API
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -65,58 +69,83 @@ async def fetch_processed_messages(chat_id: str) -> List[Dict[str, Any]]:
     return data
 
 
-def filter_messages_by_type(messages: List[Dict[str, Any]], incident_type: Optional[str]) -> List[Dict[str, Any]]:
-    """Filters messages by incident type."""
-    if not incident_type or incident_type.lower() == 'any':
-        return messages
+def filter_messages_by_time(messages: List[Dict[str, Any]],
+                            start_time: datetime,
+                            end_time: datetime,
+                            time_format: str) -> List[Dict[str, Any]]:
+    """Filters messages by time range."""
+    filtered = []
 
-    return [msg for msg in messages
-            if isinstance(msg, dict) and
-            msg.get("type") == incident_type]
+    for msg in messages:
+        timestamp = msg.get('timestamp')
+        if not timestamp or not isinstance(timestamp, str):
+            continue
+
+        try:
+            msg_time = datetime.fromisoformat(timestamp)
+            if start_time <= msg_time <= end_time:
+                if time_format:
+                    msg['timestamp'] = msg_time.strftime(time_format)
+                filtered.append(msg)
+
+        except ValueError as e:
+            logger.warning(f"Не удалось распарсить timestamp: {timestamp}, ошибка: {str(e)}")
+            continue
+
+    return filtered
 
 
-def create_empty_response(format: TableFormat, filename_base: str) -> Response:
-    """Creates an empty response in the required format."""
-    df = pd.DataFrame()
-    return generate_table_response(df, format, filename_base)
-
-
-@app.get("/generate_table")
-async def get_table(
-        chat_id: str = Query(description="Chat ID to get messages"),
-        format: TableFormat = Query(description="Desired output format"),
-        type: str = Query('any', description="Filter by incident type")
+@app.post("/generate_table/{chat_id}")
+async def generate_table(
+        chat_id: str,
+        request: TableRequest
 ):
-    """Generates data table in the requested format."""
+    """Generates a table based on a request with field mappings."""
     # Get data
     messages = await fetch_processed_messages(chat_id)
 
-    # Filter data
-    filter_type = None if type.lower() == 'any' else type
-    filtered = filter_messages_by_type(messages, filter_type)
+    # Filter by time
+    filtered = filter_messages_by_time(
+        messages,
+        request.time.start,
+        request.time.end,
+        request.time.format
+    )
 
-    # Create empty response if no data
     if not filtered:
-        filename_type = type.replace(" ", "_") if filter_type else 'all'
-        filename_base = f"{chat_id}_{filename_type}_messages"
-        return create_empty_response(format, filename_base)
+        df = pd.DataFrame(columns=request.columns)
+        return generate_table_response(df, TableFormat(request.format), f"{chat_id}_empty")
 
-    # Create DataFrame and response
-    df = create_dataframe(filtered)
-    filename_type = type.replace(" ", "_") if filter_type else 'all'
-    filename_base = f"{chat_id}_{filename_type}_messages"
+    # Apply mappings and create table
+    df = create_dataframe_from_mapping(filtered, request.type_mappings, request.columns)
 
-    return generate_table_response(df, format, filename_base)
+    # Format and send response
+    return generate_table_response(df, TableFormat(request.format), f"{chat_id}_data")
 
 
-@app.get("/generate_chart")
-async def get_chart(
-        chat_id: str = Query(description="Chat ID to get messages"),
-        chart_type: str = Query(description="Chart type")
-):
-    """Generates data for charts of the specified type."""
+@app.post("/generate_chart/{chat_id}")
+async def generate_chart(
+        chat_id: str,
+        request: ChartRequest
+) -> ChartResponse:
+    """Generates chart data based on a request with field mappings."""
+    # Get data
     messages = await fetch_processed_messages(chat_id)
-    return generate_chart_data(messages, chart_type)
+
+    # Filter by time
+    filtered = filter_messages_by_time(
+        messages,
+        request.time.start,
+        request.time.end,
+        request.time.format
+    )
+
+    # Generate chart data
+    return generate_chart_data_from_mapping(
+        filtered,
+        request.chart_definition,
+        request.type_mappings
+    )
 
 
 if __name__ == "__main__":

@@ -2,10 +2,12 @@ import io
 import logging
 from typing import List, Dict, Any, Protocol
 from enum import Enum
-from collections import Counter
 
 import pandas as pd
 from fastapi.responses import StreamingResponse, JSONResponse, Response
+
+from models import MappingItem
+from models import apply_mapping
 
 
 # Base types
@@ -19,36 +21,40 @@ class TableFormat(str, Enum):
 logger = logging.getLogger(__name__)
 
 
-def create_dataframe(messages: List[Dict[str, Any]]) -> pd.DataFrame:
-    """Converts a list of messages into a DataFrame."""
+def create_dataframe_from_mapping(
+        messages: List[Dict[str, Any]],
+        type_mappings: List[MappingItem],
+        columns: List[str]
+) -> pd.DataFrame:
+    """Creates a DataFrame based on messages using type mappings."""
     if not messages:
-        return pd.DataFrame()
+        return pd.DataFrame(columns=columns)
 
-    # First collect all unique keys from data
-    all_data_keys = set()
-    for msg in messages:
-        if isinstance(msg.get('data'), dict):
-            all_data_keys.update(msg['data'].keys())
+    # Create a dictionary of mappings by message types for quick access
+    mappings_by_type = {item.message_type: item.mapping for item in type_mappings}
 
-    # Create records for DataFrame
+    # Transform messages according to mappings
     records = []
     for msg in messages:
-        record = {
-            'sender': msg.get('sender'),
-            'text': msg.get('text'),
-            'type': msg.get('type'),
-        }
+        msg_type = msg.get('data').get('message_type')
 
-        if isinstance(msg.get('data'), dict):
-            for key in all_data_keys:
-                record[f'data_{key}'] = msg['data'].get(key)
-        else:
-            for key in all_data_keys:
-                record[f'data_{key}'] = None
+        # Skip messages without a defined mapping
+        if not msg_type or msg_type not in mappings_by_type:
+            continue
 
-        records.append(record)
+        # Apply the corresponding mapping
+        mapped_data = apply_mapping(msg, mappings_by_type[msg_type])
+        records.append(mapped_data)
 
-    return pd.DataFrame(records)
+    # Create DataFrame with specified columns
+    df = pd.DataFrame(records)
+
+    # Ensure presence of all requested columns
+    for col in columns:
+        if col not in df.columns:
+            df[col] = None
+
+    return df
 
 
 class TableGenerator(Protocol):
@@ -108,49 +114,3 @@ def generate_table_response(df: pd.DataFrame, format: TableFormat, filename_base
     except Exception as e:
         logger.error(f"Error creating {format.value}: {str(e)}")
         raise
-
-
-class ChartGenerator(Protocol):
-    def __call__(self, messages: List[Dict[str, Any]]) -> Dict[str, Any]: ...
-
-
-def sender_activity_chart(messages: List[Dict[str, Any]]) -> Dict[str, Any]:
-    """Creates data for sender activity chart."""
-    sender_counts = Counter(msg.get('sender', 'Unknown sender') for msg in messages)
-
-    return {
-        "labels": list(sender_counts.keys()),
-        "values": list(sender_counts.values())
-    }
-
-
-# Dictionary of chart generators
-CHART_GENERATORS: Dict[str, ChartGenerator] = {
-    "sender_activity": sender_activity_chart
-}
-
-
-def generate_chart_data(messages: List[Dict[str, Any]], chart_type: str) -> JSONResponse:
-    """Dispatcher for creating chart data."""
-    if not messages:
-        return JSONResponse(content={"labels": [], "values": []})
-
-    generator = CHART_GENERATORS.get(chart_type)
-    if not generator:
-        return JSONResponse(
-            status_code=400,
-            content={
-                "error": f"Unsupported chart type: {chart_type}",
-                "available_types": list(CHART_GENERATORS.keys())
-            }
-        )
-
-    try:
-        chart_data = generator(messages)
-        return JSONResponse(content=chart_data)
-    except Exception as e:
-        logger.error(f"Error creating chart '{chart_type}': {str(e)}")
-        return JSONResponse(
-            status_code=500,
-            content={"error": f"Failed to create data for chart '{chart_type}'"}
-        )
