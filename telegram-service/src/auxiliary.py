@@ -69,3 +69,29 @@ async def get_blob_photo(photo) -> str | None:
     # Encode the image in base64
     image_blob = base64.b64encode(image_bytes).decode('utf-8')
     return image_blob
+
+
+async def get_blob_video(video) -> str | None:
+    if not video:
+        return None
+    
+    # Get the video file
+    video_file = await video.get_file()
+    # Download video as byte array
+    video_bytes = await video_file.download_as_bytearray()
+    # Encode the video in base64
+    video_blob = base64.b64encode(video_bytes).decode('utf-8')
+    return video_blob
+
+
+async def get_blob_voice(voice) -> str | None:
+    if not voice:
+        return None
+    
+    # Get the voice file
+    voice_file = await voice.get_file()
+    # Download voice as byte array
+    voice_bytes = await voice_file.download_as_bytearray()
+    # Encode the voice in base64
+    voice_blob = base64.b64encode(voice_bytes).decode('utf-8')
+    return voice_blob
