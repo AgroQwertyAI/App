@@ -9,6 +9,8 @@ dependencies = [
     "dotenv>=0.9.9",
     "fastapi>=0.115.12",
     "google>=3.0.0",
+    "google-api-python-client>=2.102.0",
+    "google-auth>=2.22.0",
     "python-crontab>=3.2.0",
     "uvicorn>=0.34.0",
 ]
