@@ -16,4 +16,4 @@ dependencies = [
 ]
 [tool.poe.tasks]
 start = "python -m main"
-mock = "python -m moc_server"
+mock = "python -m mock_server"
