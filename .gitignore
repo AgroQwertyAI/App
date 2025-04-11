@@ -318,3 +318,5 @@ data-presentation/.venv
 message-processing-service/__pycache__
 message-processing-service/.venv
 
+file-service/config
+file-service/data

@@ -1,0 +1,24 @@
+services:
+  file-service:
+    build:
+      context: ./file-service
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./file-service:/app
+      - local_files:/app/src/reports
+      - cron_config:/var/spool/cron
+    environment:
+      - PYTHONUNBUFFERED=1
+    restart: unless-stopped
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  local_files:
+  cron_config:

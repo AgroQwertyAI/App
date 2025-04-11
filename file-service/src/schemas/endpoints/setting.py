@@ -40,7 +40,7 @@ class SettingPost(BaseModel):
     extra: dict = Field(description="The extra information about the setting", example={})
 
 
-class SettingPatch(SettingPost):
+class SettingPut(SettingPost):
     setting_name: str = Field(description="The name of the setting")
     setting_description: str = Field(description="The optional description of the setting")
     format_report: Literal["xlsx"] = Field(description="The format to which write final report")

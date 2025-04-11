@@ -11,7 +11,6 @@ class MessageReportGet(BaseModel):
     setting_id: int = Field(description="The unique identifier of the setting to which the message belongs")
     report_id: int = Field(description="The unique identifier of the report to which the message belongs")
 
-    timedata: datetime = Field(description="The timedata of the report")
     original_message_text: str = Field(description="The original text of the message")
     formatted_message_text: dict = Field(
         description="The formatted json of the message", 

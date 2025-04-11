@@ -26,8 +26,6 @@ class MessagePendingPost(BaseModel):
     sender_name: str = Field(description="The name of the message sender")
     sender_id: str = Field(description="The id of the message sender")
 
-    setting_id: int = Field(description="The unique identifier of the setting to which the message belongs")
-
     original_message_text: str = Field(description="The original text of the message")
     formatted_message_text: dict = Field(
         description="The formatted json of the message", 
@@ -37,7 +35,7 @@ class MessagePendingPost(BaseModel):
     extra: dict = Field(description="The extra information about the message", example={"image": "base64,<image>"})
 
 
-class MessagePendingPatch(BaseModel):
+class MessagePendingPut(BaseModel):
     original_message_text: str | None = Field(None, description="The original text of the message")
     formatted_message_text: dict = Field(
         description="The formatted json of the message", 
