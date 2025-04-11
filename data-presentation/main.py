@@ -57,16 +57,30 @@ async def fetch_data_service(url: str) -> dict:
         raise HTTPException(status_code=503, detail=f"Data service is unavailable: {str(e)}")
 
 
+def normalize_messages(messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Converts messages with data as a list into individual messages."""
+    normalized = []
+
+    for msg in messages:
+        if isinstance(msg.get('data'), list):
+            for data_item in msg['data']:
+                new_msg = {k: v for k, v in msg.items() if k != 'data'}
+                new_msg['data'] = data_item
+                normalized.append(new_msg)
+        else:
+            normalized.append(msg)
+
+    return normalized
+
+
 async def fetch_processed_messages(chat_id: str) -> List[Dict[str, Any]]:
-    """Gets processed messages for the specified chat_id."""
     url = f"{DATA_SERVICE_URL}/api/chats/messages/{chat_id}"
     data = await fetch_data_service(url)
 
     if not isinstance(data, list):
-        raise HTTPException(status_code=502,
-                            detail="Invalid data format from data service (expected list)")
+        raise HTTPException(status_code=502, detail="Invalid data format")
 
-    return data
+    return normalize_messages(data)
 
 
 def filter_messages_by_time(messages: List[Dict[str, Any]],

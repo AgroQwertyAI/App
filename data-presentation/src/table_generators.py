@@ -6,8 +6,8 @@ from enum import Enum
 import pandas as pd
 from fastapi.responses import StreamingResponse, JSONResponse, Response
 
-from models import MappingItem
-from models import apply_mapping
+from src.models import MappingItem
+from src.models import apply_mapping
 
 
 # Base types
