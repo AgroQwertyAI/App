@@ -1,0 +1,10 @@
+curl -X POST "http://localhost:8001/new_message" \
+-H "Content-Type: application/json" \
+-d '{
+    "message_id": "msg_12345",
+    "source_name": "whatsapp",
+    "chat_id": "120363416114039646@g.us",
+    "text": "Hello, this is a test message",
+    "sender_name": "Test User",
+    "sender_id": "user_123"
+}'

@@ -2,16 +2,23 @@ const qrcode = require('qrcode-terminal');
 const { Client, LocalAuth, MessageMedia } = require('whatsapp-web.js');
 const axios = require('axios');
 const fs = require('fs');
+const express = require('express');
 require('dotenv').config();
 
 // Environment variables
 const DATA_SERVICE_URI = process.env.DATA_SERVICE_URI;
 const MESSAGE_PROCESSING_URI = process.env.MESSAGE_PROCESSING_URI;
+const PORT = process.env.PORT || 52101;
 
 if (!DATA_SERVICE_URI || !MESSAGE_PROCESSING_URI) {
   console.error('Environment variables DATA_SERVICE_URI and MESSAGE_PROCESSING_URI must be set');
   process.exit(1);
 }
+
+// Initialize Express server
+const app = express();
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 // Track registered chats to avoid duplicates
 const registeredChats = new Set();
@@ -54,18 +61,7 @@ client.on('auth_failure', (msg) => {
 client.on('ready', async () => {
   console.log('WhatsApp bot is ready and online!');
   
-  // Register all existing chats
-  try {
-    const chats = await client.getChats();
-    for (const chat of chats) {
-      if (chat.isGroup) {
-        await registerChat(chat);
-      }
-    }
-    console.log(`Registered ${registeredChats.size} existing chats`);
-  } catch (error) {
-    console.error('Error registering existing chats:', error.message);
-  }
+
 });
 
 // Handle new messages
@@ -75,13 +71,23 @@ client.on('message', async (message) => {
     if (message.fromMe) return;
     
     const chat = await message.getChat();
+    const contact = await message.getContact();
+    const lowerCaseText = message.body.toLowerCase();
+    const isPrivate = !chat.isGroup;
     
-    // Register chat if not already done
-    if (!registeredChats.has(chat.id._serialized) && chat.isGroup) {
+    // Handle monitor command for group chats
+    if (chat.isGroup && !registeredChats.has(chat.id._serialized) && 
+        (message.body === '/monitor' || lowerCaseText.includes('следи за этим чатом'))) {
       await registerChat(chat);
+      await client.sendMessage(chat.id._serialized, 'Chat monitoring has been activated. I will now process messages from this group.');
+      return; // Skip further processing of the command message
     }
     
-    const contact = await message.getContact();
+    // Only process messages from registered chats for groups
+    // For private messages, process them regardless of registration
+    if (!isPrivate && !registeredChats.has(chat.id._serialized)) {
+      return; // Skip processing for unregistered group chats
+    }
     
     // Prepare message data
     const messageData = {
@@ -90,7 +96,8 @@ client.on('message', async (message) => {
       chat_id: chat.id._serialized,
       text: message.body,
       sender_id: contact.id._serialized,
-      sender_name: contact.name || contact.pushname || contact.number || "Unknown"
+      sender_name: contact.name || contact.pushname || contact.number || "Unknown",
+      is_private: isPrivate
     };
     
     // Handle media if present
@@ -103,7 +110,7 @@ client.on('message', async (message) => {
     
     // Send to message processing service
     await axios.post(`${MESSAGE_PROCESSING_URI}/new_message`, messageData);
-    console.log(`Message from ${messageData.sender_name} in ${chat.name} forwarded to processing service`);
+    console.log(`${isPrivate ? 'Private message' : 'Group message'} from ${messageData.sender_name} forwarded to processing service`);
     
   } catch (error) {
     console.error('Error processing message:', error.message);
@@ -119,7 +126,7 @@ client.on('group_join', async (notification) => {
     
     if (addedParticipants.includes(botNumber)) {
       const chat = await notification.getChat();
-      await registerChat(chat);
+      
       console.log(`Bot was added to group: ${chat.name}`);
     }
   } catch (error) {
@@ -149,6 +156,39 @@ async function registerChat(chat) {
     console.error(`Failed to register chat ${chat.name}:`, error.message);
   }
 }
+// Endpoint to send a message
+app.post('/send_message', async (req, res) => {
+  try {
+    const { user, text } = req.body;
+    
+    if (!user || !text) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Both user and text parameters are required' 
+      });
+    }
+
+    // Check if user is a valid phone number or chat ID
+    let chatId = user;
+    
+    // Send the message
+    await client.sendMessage(chatId, text);
+    
+    console.log(`Message sent to ${chatId}: ${text}`);
+    return res.status(200).json({ success: true });
+  } catch (error) {
+    console.error('Error sending message:', error.message);
+    return res.status(500).json({ 
+      success: false, 
+      error: error.message 
+    });
+  }
+});
+
+// Start Express server
+app.listen(PORT, () => {
+  console.log(`WhatsApp service listening on port ${PORT}`);
+});
 
 // Initialize client
 client.initialize().catch(error => {
