@@ -4,12 +4,11 @@ import logging
 from typing import List, Dict, Any
 from datetime import datetime
 
-import uvicorn
 import aiohttp
 import pandas as pd
 from fastapi import FastAPI, HTTPException
 from dotenv import load_dotenv
-
+from fastapi.middleware.cors import CORSMiddleware
 from src.models import TableRequest, ChartRequest, ChartResponse
 from src.table_generators import (
     create_dataframe_from_mapping,
@@ -40,6 +39,13 @@ app = FastAPI(
     version="0.1"
 )
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 async def fetch_data_service(url: str) -> dict:
     """Base function for data service requests."""
@@ -147,8 +153,3 @@ async def generate_chart(
         request.type_mappings
     )
 
-
-if __name__ == "__main__":
-    logger.info(f"Starting data presentation service on port {API_PORT}")
-    logger.info(f"Connecting to data service at {DATA_SERVICE_URL}")
-    uvicorn.run(app, host="127.0.0.1", port=API_PORT)

@@ -3,8 +3,8 @@ from abc import ABC, abstractmethod
 from typing import List, Tuple, Any, Set, Dict, Optional
 from collections import defaultdict
 
-from models import ChartResponse, ChartDataset, ChartDefinition, MappingItem
-from models import apply_mapping
+from src.models import ChartResponse, ChartDataset, ChartDefinition, MappingItem
+from src.models import apply_mapping
 
 logger = logging.getLogger(__name__)
 

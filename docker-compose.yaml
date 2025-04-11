@@ -15,6 +15,41 @@ services:
     networks:
       - app-network
 
+  data-presentation:
+    build:
+      context: ./data-presentation
+      dockerfile: Dockerfile
+    ports:
+      - "52003:52003"
+    volumes:
+      - ./data-presentation:/app
+    env_file:
+      - ./data-presentation/.env
+    environment:
+      - PYTHONUNBUFFERED=1
+    restart: unless-stopped
+    networks:
+      - app-network
+
+  message-processing:
+    build:
+      context: ./message-processing-service
+      dockerfile: Dockerfile
+    ports:
+      - "8001:8001"
+    volumes:
+      - ./message-processing-service:/app
+    env_file:
+      - ./message-processing-service/.env
+    environment:
+      - PYTHONUNBUFFERED=1
+      - DATA_SERVICE_URL=http://host.docker.internal:3000
+    restart: unless-stopped
+    networks:
+      - app-network
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
 networks:
   app-network:
     driver: bridge

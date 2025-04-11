@@ -7,6 +7,7 @@ from src.routers.cloud_config import cloud_config_router
 import logging
 from src.init_db import init_db
 from contextlib import asynccontextmanager
+from fastapi.middleware.cors import CORSMiddleware
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -24,6 +25,14 @@ async def lifespan(app: FastAPI):
     logger.info("File Service shutting down...")
 
 app = FastAPI(title="File Service", description="File Service", lifespan=lifespan)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 app.include_router(settings_router, prefix="/api")
 app.include_router(message_pending_router, prefix="/api")

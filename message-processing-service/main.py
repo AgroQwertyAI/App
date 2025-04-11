@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 from typing import Dict, Any, Optional
 from dotenv import load_dotenv
 import traceback # For logging
+from fastapi.middleware.cors import CORSMiddleware
 
 from agent import Agent
 
@@ -19,6 +20,13 @@ logger = logging.getLogger(__name__)
 load_dotenv()
 
 app = FastAPI(title="Message Processing Service")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 agents = {}
 
@@ -105,12 +113,3 @@ async def new_message(message: NewMessageRequest, background_tasks: BackgroundTa
         "status": "received_processing_started",
         "message_id": message.message_id
     }
-
-# --- Main Execution ---
-def main():
-    import uvicorn
-    logger.info(f"Starting Message Processing Service on port {API_PORT}")
-    uvicorn.run(app, host="0.0.0.0", port=API_PORT)
-
-if __name__ == "__main__":
-    main()
