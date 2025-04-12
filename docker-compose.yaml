@@ -1,4 +1,20 @@
 services:
+  messenger-api-service:
+    build:
+      context: ./messenger-api-service
+      dockerfile: Dockerfile
+    ports:
+      - "8005:8005"
+    volumes:
+      - ./messenger-api-service:/app
+      - ./database:/messenger_api_service_database
+      - messenger_api_service_cron_config:/var/spool/cron
+    environment:
+      - PYTHONUNBUFFERED=1
+    restart: unless-stopped
+    networks:
+      - app-network
+
   file-service:
     build:
       context: ./file-service
@@ -7,8 +23,8 @@ services:
       - "8000:8000"
     volumes:
       - ./file-service:/app
-      - local_files:/app/src/reports
-      - cron_config:/var/spool/cron
+      - file_service_local_files:/app/src/reports
+      - file_service_cron_config:/var/spool/cron
     environment:
       - PYTHONUNBUFFERED=1
     restart: unless-stopped
@@ -55,5 +71,6 @@ networks:
     driver: bridge
 
 volumes:
-  local_files:
-  cron_config:
+  file_service_local_files:
+  messenger_api_service_cron_config:
+  file_service_cron_config:

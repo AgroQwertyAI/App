@@ -11,23 +11,20 @@ RUN mkdir -p /var/spool/cron/crontabs && \
     chmod -R 0644 /var/spool/cron && \
     chmod -R 1730 /var/spool/cron/crontabs
 
+# Set working directory
 WORKDIR /app
 
 # Copy dependency files
 COPY pyproject.toml ./
 
-# Install dependencies using pip
 RUN pip install -e .
 
-# Copy the application
+# Copy the rest of the application
 COPY . .
-
-# Create a startup script to run both the app and cron service
 COPY start.sh /start.sh
 RUN chmod +x /start.sh
+# Expose port
+EXPOSE 8005
 
-# Expose port for the FastAPI application
-EXPOSE 8000
-
-# Run both cron and the application
+# Command to run the application using the startup script
 CMD ["/start.sh"]
