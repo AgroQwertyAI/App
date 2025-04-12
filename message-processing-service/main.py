@@ -8,7 +8,6 @@ from pydantic import BaseModel, Field
 from typing import Dict, Any, Optional
 from dotenv import load_dotenv
 import traceback # For logging
-from fastapi.middleware.cors import CORSMiddleware
 
 from agent import Agent
 
@@ -20,13 +19,6 @@ logger = logging.getLogger(__name__)
 load_dotenv()
 
 app = FastAPI(title="Message Processing Service")
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
 agents = {}
 
@@ -70,13 +62,13 @@ async def is_monitoring(chat_id: str) -> bool:
                 else:
                     error_text = await response.text()
                     logger.error(f"Failed to fetch chat status for {chat_id}: {response.status} - {error_text}")
-                    return False  # Default to not monitoring if we can't fetch status
+                    return True  # Default to not monitoring if we can't fetch status
     except aiohttp.ClientError as e:
         logger.error(f"HTTP Client Error fetching chat status for {chat_id}: {str(e)}")
-        return False
+        return True
     except Exception as e:
         logger.error(f"Error checking monitoring status for chat {chat_id}: {traceback.format_exc()}")
-        return False
+        return True
 # --- API Endpoints ---
 
 @app.on_event("startup")
@@ -98,7 +90,7 @@ async def new_message(message: NewMessageRequest, background_tasks: BackgroundTa
     """
     logger.info(f"Received new message: ID {message.message_id} from {message.source_name}, chat_id: {message.chat_id}")
 
-    if not await is_monitoring(message.chat_id) and not message.is_private:
+    if not message.is_private and not await is_monitoring(message.chat_id)  :
         logger.info(f"Chat {message.chat_id} is not active. Skipping processing.")
         return {"status": "chat_not_active"}
 
@@ -113,3 +105,12 @@ async def new_message(message: NewMessageRequest, background_tasks: BackgroundTa
         "status": "received_processing_started",
         "message_id": message.message_id
     }
+
+# --- Main Execution ---
+def main():
+    import uvicorn
+    logger.info(f"Starting Message Processing Service on port {API_PORT}")
+    uvicorn.run(app, host="0.0.0.0", port=API_PORT)
+
+if __name__ == "__main__":
+    main()

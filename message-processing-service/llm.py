@@ -4,15 +4,18 @@ from typing import List, Dict, Any, Optional
 
 LLM_SERVICE_URL = os.environ.get("LLM_SERVICE_URL", "http://37.194.195.213:6325/v1")
 
+print("URI" + LLM_SERVICE_URL)
+
 client = AsyncOpenAI(
-    base_url=LLM_SERVICE_URL,
+    base_url= "http://37.194.195.213:6325/v1",
     api_key="nova-proxy"
 )
 
 async def chat(
     model: str,
     messages: List[Dict[str, Any]],
-    tools: Optional[List[Dict[str, Any]]] = None
+    tools: Optional[List[Dict[str, Any]]] = None,
+    structure: Optional[Any] = None
 ) -> Dict[str, Any]:
     """
     Asynchronously call the LLM API with the given parameters.
@@ -31,12 +34,17 @@ async def chat(
         "max_tokens": 8192
     }
     
+    extra_body = {}
+    
+    if structure:
+        extra_body["json_schema"] = structure
+        
     if tools:
         kwargs["tools"] = tools
     
     try:
-        response = await client.chat.completions.create(**kwargs)
-        print(response)
+        response = await client.chat.completions.create(**kwargs, extra_body=extra_body)
+        
         return response
     except Exception as e:
         print(f"Error calling LLM API: {e}")

@@ -5,7 +5,7 @@ from llm import chat
 STRAGEGY = "CSV"
 MODEL_NAME = "Mistral"
 
-async def agentic(history: list, message: str) -> bool:
+async def agentic(history: list, message: str):
     
     payload = history
     
@@ -37,7 +37,7 @@ async def is_report(message: str) -> bool:
     payload = [
         {
             "role": "system",
-            "content": f"Ты - {MODEL_NAME}, очень точная и интеллектуальная модель классификации агрономисеских отчётов. Тебе будет дано сообщение из чата и всё что тебе нужно сделать это определить является ли оно агрономическим отчётом. Агрономический отчет - сообщение в свободной форме с информацией о каких-то операциях на полях. Подумай и если это сообщение является отчётом, наипши 'REPORT', если оно не является отчётом, например , 'TALK'."  
+            "content": f"Ты - {MODEL_NAME}, очень точная и интеллектуальная модель классификации агрономических отчётов. Тебе будет дано сообщение из чата и всё что тебе нужно сделать это определить является ли оно агрономическим отчётом. Агрономический отчет - сообщение в свободной форме с информацией о каких-то операциях на полях. Подумай и если это сообщение является отчётом, наипши 'REPORT', если оно не является отчётом, например , 'TALK'."  
         },
         {
             "role": "user",
@@ -50,19 +50,80 @@ async def is_report(message: str) -> bool:
     
     return 'REPORT' in result
 
-async def extract_data_from_message(message: str) -> dict:
-    result = ""
+async def split_report(message: str, prompt = None) -> list:
+    instr = f"Пользователь даст тебе отчёт из чата и перед тобой стоит задача разделить его на отдельные события. Исходный формат в свободном формате и может иметь сокращения. Вот возможные операции: 1-я междурядная культивация, 2-я междурядная культивация, Боронование довсходовое, Внесение минеральных удобрений, Выравнивание зяби, 2-е Выравнивание зяби, Гербицидная обработка, 1 Гербицидная обработка, 2 Гербицидная обработка, 3 Гербицидная обработка, 4 Гербицидная обработка, Дискование, Дискование 2-е, Инсектицидная обработка, Культивация, Пахота, Подкормка, Предпосевная культивация, Прикатывание посевов, Сев, Сплошная культивация, Уборка, Функицидная обработка, Чизлевание. Твоя задача - вывести списком разделенные на отдельные сообщения события. Для каждого события из исходного сообщения нужно в точности переписать все относящиеся к нему данные. Если в сообщении была информация относящаяся ко всем событиям - дата для всех сообщений или название подразделения, тебе нужно переписать их в дополнении к каждому разделенному сообщению. Некоторые события могут быть не полными и содержать не все поля. Внимание, формат вывода: тебе нужно вывести результат в качестве json обьекта с полем separated_reports типа массива строк. Json должен быть корректным для парсинга."
+    if prompt:
+        instr =  prompt
     
-    if STRAGEGY == "CSV":
-        result = await extract_csv(message)
-        
-    return result
-
-async def extract_csv(message: str) -> dict:
     payload = [
         {
             "role": "system",
-            "content": f"Ты - {MODEL_NAME}, очень точная и интеллектуальная модель. Тебе будет дано сообщение из агрономического чата и твоя задача подумать и выделить из неё нужную информацию для того чтобы вывести её в строгом формате .csv файла с разделителем ';'. В конце ответа, помести итоговый .csv файл в блок ```csv\n<CSV таблица здесь```. Нужно использовать точно такое описание таблицы и не пропускать колонки: {format_table_definition_for_llm('default_table_definition.json')}. Важно: некоторые поля могут быть пустыми. Если в сообщении нет информации для ячеек \"Подразделение, Операция, Культура\" (остальные поля могут быть пустыми), тебе нужно задать дополнительный вопрос для отправителя сообщения в блоке ```message\n<Сообщение здесь>```\n\n"  
+            "content":   instr
+        },
+        {
+            "role": "user",
+            "content": f"Вот сообщение, которое тебе необходимо разделить: {message}"
+        }
+    ]
+    
+    structure = {
+        "type": "object",
+        "properties": {
+            "separated_reports": {
+                "type": "array",
+                "items": {
+                    "type": "string"
+                }
+            }
+        },
+        "required": ["separated_reports"]
+    }
+    
+    result = await chat("mist", payload, structure=structure)
+    parsed_result = json.loads(result.choices[0].message.content)
+    
+    return parsed_result.get("separated_reports", [])
+
+
+async def extract_data_from_message(message: str, template: dict) -> dict:
+    result = []
+    
+    split = await split_report(message, template.get("taskSplitPrompt"))
+    
+    
+    for message in split:
+        result.append(await extract_csv(message, template.get("systemPrompt")))
+    
+    return result
+
+async def get_history_for_followup(table: str, assistant_message: str) -> dict:
+    payload = [
+        {
+            "role": "system",
+            "content": "Твоя задача исправить таблицу, получив ответы на дополнительные вопросы, чтобы исправить проблемы. Когда пользователь даст ответы на все вопросы, тебе нужно вывести итоговую исправленную таблицу в формате ```csv\n<таблица здесь```. Если пользователь не предоставил ответы на вопросы, ты можешь переспросить."
+        },
+        {
+            "role": "user",
+            "content": table
+        },
+        {
+            "role": "assistant",
+            "content": assistant_message
+        }
+    ]
+    
+    return payload
+
+async def extract_csv(message: str, prompt = None) -> dict:
+    inst = open('prompt.txt', encoding='utf-8').read()  
+    
+    if prompt:
+        inst = prompt
+    
+    payload = [
+        {
+            "role": "system",
+            "content": inst
         },
         {
             "role": "user",
@@ -93,8 +154,8 @@ async def extract_csv(message: str) -> dict:
                     data.append(row_data)
     
     question = None
-    if "```message" in result:
-        parts = result.split("```message\n", 1)
+    if "```question" in result:
+        parts = result.split("```question", 1)
         if len(parts) > 1:
             message_block = parts[1].split("```", 1)[0]
             question = message_block.strip()

@@ -27,7 +27,8 @@ payload = {
     "chat_id": "120363416114039646@g.us",
     "text": long_message,
     "sender_name": "Test User",
-    "sender_id": "user_123"
+    "sender_id": "user_123",
+    "is_private": False,
 }
 
 headers = {"Content-Type": "application/json"}
