@@ -7,7 +7,7 @@
       <excludeFolder url="file://$MODULE_DIR$/data-service/.venv/Lib" />
       <excludeFolder url="file://$MODULE_DIR$/data-service/.venv/Scripts" />
     </content>
-    <orderEntry type="jdk" jdkName="Python 3.12 virtualenv at C:\Users\grigo\PycharmProjects\AgroQwertyAI\App\data-presentation\.venv" jdkType="Python SDK" />
+    <orderEntry type="jdk" jdkName="Python 3.12 virtualenv at C:\Users\grigo\PycharmProjects\AgroQwertyAI\App\classification-service\.venv" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />
   </component>
   <component name="PyDocumentationSettings">
