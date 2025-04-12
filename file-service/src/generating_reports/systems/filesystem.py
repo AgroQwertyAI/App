@@ -9,6 +9,7 @@ import logging
 from datetime import datetime
 from src.newsletter import send_report
 import shutil
+from collections import defaultdict
 from src.generating_reports.helper import (
     get_pending_messages, 
     aggregate_messages, 
@@ -67,39 +68,62 @@ def save_filesystem_report_and_send_messages(setting: dict) -> bool:
         for message in json.loads(setting['send_to']) if isinstance(setting['send_to'], str) else setting['send_to']:
             send_report(file, message['messenger'], message['phone_number'])
         
-        # Create MessageReport objects
+        # Group messages by sender_id
+        messages_by_sender = defaultdict(list)
         for message in pending_messages:
-            user_id = message["sender_id"]
-            user_dir = f"{messages_dir}/{user_id}"
+            sender_id = message["sender_id"]
+            messages_by_sender[sender_id].append(message)
+        
+        # Process each sender's messages as a group
+        for sender_id, sender_messages in messages_by_sender.items():
+            user_dir = f"{messages_dir}/{sender_id}"
             os.makedirs(user_dir, exist_ok=True)
             
-            # 5. Save message files in filesystem
-            # Save raw text
-            with open(f"{user_dir}/raw_text.txt", "w") as f:
-                f.write(message["original_message_text"])
+            # 1. Aggregate original_message_text with [SEP] separators
+            aggregated_text = ""
+            for i, message in enumerate(sender_messages):
+                if i > 0:
+                    aggregated_text += "\n[SEP]\n"
+                aggregated_text += message["original_message_text"]
             
-            # Save formatted text
+            # Save aggregated raw text
+            with open(f"{user_dir}/raw_text.txt", "w") as f:
+                f.write(aggregated_text)
+            
+            # 2. Aggregate formatted_message_text JSON objects
+            aggregated_json = {}
+            for message in sender_messages:
+                message_json = json.loads(message["formatted_message_text"])
+                for field, value in message_json.items():
+                    if field not in aggregated_json:
+                        aggregated_json[field] = [value]
+                    else:
+                        aggregated_json[field].append(value)
+            
+            # Save aggregated formatted text
             with open(f"{user_dir}/formatted_text.json", "w") as f:
-                f.write(message["formatted_message_text"])
+                f.write(json.dumps(aggregated_json))
 
-            # Handle extra data (like images) if they exist
-            extra_data = json.loads(message["extra"] if message["extra"] else "{}")
-            if extra_data and "image" in extra_data:
-                image_data = extra_data["image"]
-                
-                # Save the base64 encoded image
-                if "data" in image_data:
-                    try:
-                        image_binary, image_extension = get_image_binary_from_base64(image_data["data"])
-                        
-                        # Write binary data to file
-                        with open(f"{user_dir}/image.{image_extension}", "wb") as f:
-                            f.write(image_binary)
-                    except Exception as e:
-                        logger.error(f"Error saving image: {e}")
+            # Handle extra data (like images) from all messages
+            for i, message in enumerate(sender_messages):
+                extra_data = json.loads(message["extra"] if message["extra"] else "{}")
+                if extra_data and "image" in extra_data:
+                    image_data = extra_data["image"]
+                    
+                    # Save the base64 encoded image with index to keep them separate
+                    if "data" in image_data:
+                        try:
+                            image_binary, image_extension = get_image_binary_from_base64(image_data["data"])
+                            
+                            # Write binary data to file with index suffix
+                            with open(f"{user_dir}/image_{i}.{image_extension}", "wb") as f:
+                                f.write(image_binary)
+                        except Exception as e:
+                            logger.error(f"Error saving image: {e}")
 
-            # Create MessageReport record
-            save_message_report_to_db(message, report_id, conn)
+            # Create MessageReport records for each original message
+            for message in sender_messages:
+                save_message_report_to_db(message, report_id, conn)
 
         # 6. Delete previous messages_pending for this setting
         delete_pending_messages(setting_id, conn)

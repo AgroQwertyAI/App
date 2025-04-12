@@ -1,23 +1,20 @@
 from fastapi import APIRouter, HTTPException, Body
 import os
 import json
-from src.generating_reports.systems.yandex_disk import get_oauth_token
-from src.generating_reports.systems.yandex_disk import OAUTH_CONFIG_FILE, OAUTH_CONFIG_DIR
-from src.schemas.other.config import GoogleDriveConfig
-from src.generating_reports.systems.google_drive import get_google_drive_config
+from src.generating_reports.systems.yandex_disk import get_yandex_disk_config, CONFIG_FILE_YANDEX_DISK, OAUTH_CONFIG_DIR
+from src.schemas.other.config import GoogleDriveConfig, YandexDiskConfig
+from src.generating_reports.systems.google_drive import get_google_drive_config, CONFIG_FILE_GOOGLE_DRIVE
 
 cloud_config_router = APIRouter(tags=["cloud_config"])
 
+
 # Create config directory if it doesn't exist
 os.makedirs(OAUTH_CONFIG_DIR, exist_ok=True)
-
-# Define Google Drive config file path
-GOOGLE_DRIVE_CONFIG_FILE = OAUTH_CONFIG_DIR / "google_drive_credentials.json"
-
+# Define the path for storing the token
 
 @cloud_config_router.get(
-    "/yandex-oauth-token", 
-    response_model=str, 
+    "/yandex-disk-credentials", 
+    response_model=YandexDiskConfig, 
     status_code=200,
     responses={
         404: {
@@ -25,24 +22,35 @@ GOOGLE_DRIVE_CONFIG_FILE = OAUTH_CONFIG_DIR / "google_drive_credentials.json"
         }
     }
 )
-async def get_yandex_oauth_token():
-    """Get the current Yandex OAuth token."""
-    token = get_oauth_token()
-    if not token:
+async def get_yandex_config():
+    """Get the current Yandex OAuth token and shared folder link."""
+    # Get the full config data
+    config_data = get_yandex_disk_config()
+    
+    # If no config data exists or token is missing
+    if not config_data or "token" not in config_data or not config_data["token"]:
         raise HTTPException(status_code=404, detail="No Yandex OAuth token found")
-    return token
+    
+    # Return the config using the YandexDiskConfig model
+    return YandexDiskConfig(
+        token=config_data["token"],
+        shared_folder_name=config_data.get("shared_folder_name", "")
+    )
 
 
 @cloud_config_router.post(
-    "/yandex-oauth-token", 
-    response_model=str, 
+    "/yandex-disk-credentials", 
+    response_model=YandexDiskConfig, 
     status_code=201
 )
-async def set_yandex_oauth_token(token: str = Body(...)):
-    """Set a new Yandex OAuth token."""
-    with open(OAUTH_CONFIG_FILE, "w") as f:
-        json.dump({"token": token}, f)
-    return token
+async def set_yandex_disk_config(config: YandexDiskConfig = Body(...)):
+    """Set a new Yandex OAuth token and shared folder link."""
+    with open(CONFIG_FILE_YANDEX_DISK, "w") as f:
+        json.dump({
+            "token": config.token,
+            "shared_folder_name": config.shared_folder_name
+        }, f, indent=2)
+    return config
 
 
 @cloud_config_router.get(
@@ -73,7 +81,7 @@ async def set_google_drive_info(
         "shared_folder_name": google_drive_config.shared_folder_name
     }
     
-    with open(GOOGLE_DRIVE_CONFIG_FILE, "w") as f:
+    with open(CONFIG_FILE_GOOGLE_DRIVE, "w") as f:
         json.dump(credentials, f, indent=2)
     
     return google_drive_config

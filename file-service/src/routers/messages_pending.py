@@ -76,8 +76,6 @@ async def get_messages(
     description="Create a pending message for a setting", 
     responses={404:{
         "description": "Setting not found"
-    }, 400: {
-        'description': 'User with this user id already posted a message'
     }}
 )
 async def create_message(
@@ -92,18 +90,6 @@ async def create_message(
         setting = cursor.fetchone()
         if not setting:
             raise HTTPException(status_code=404, detail="Setting not found")
-        
-        # Check if user with this user id already posted a message in this setting
-        cursor.execute(
-            "SELECT message_id FROM messages_pending WHERE setting_id = ? AND sender_id = ?", 
-            (setting_id, message.sender_id)
-        )
-        existing_message = cursor.fetchone()
-        if existing_message:
-            raise HTTPException(
-                status_code=400, 
-                detail="User with this user id already posted a message"
-            )
         
         # Insert the new message
         current_time = datetime.now(timezone.utc).isoformat()

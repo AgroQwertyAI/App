@@ -20,25 +20,19 @@ from src.generating_reports.helper import (
     save_message_report_to_db,
     delete_pending_messages
 )
+from collections import defaultdict
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-# Define config paths
-OAUTH_CONFIG_DIR = Path("config")
-GOOGLE_DRIVE_CONFIG_FILE = OAUTH_CONFIG_DIR / "google_drive_credentials.json"
-
-# Default values if config is not found
-DEFAULT_BASE_FOLDER_NAME = "agriculture"
+OAUTH_CONFIG_DIR = Path("/app/config")
+CONFIG_FILE_GOOGLE_DRIVE = OAUTH_CONFIG_DIR / "google_drive_credentials.json"
 
 def get_google_drive_config():
     """Get the Google Drive credentials from the configuration file."""
-    if GOOGLE_DRIVE_CONFIG_FILE.exists():
-        with open(GOOGLE_DRIVE_CONFIG_FILE, "r") as f:
-            data = json.load(f)
-            return data
-    
-    return None
+    with open(CONFIG_FILE_GOOGLE_DRIVE, "r") as f:
+        data = json.load(f)
+        return data
 
 def get_drive_service():
     """Create and return a Google Drive service instance"""
@@ -125,12 +119,11 @@ def upload_file(service, file_content, filename, parent_id, mime_type):
     
     return file.get('id')
 
-def find_shared_folder(service, folder_name=None):
+def find_shared_folder(service):
     """Find a folder that has been shared with the service account"""
     # Get folder name from config, or use default
-    if folder_name is None:
-        config = get_google_drive_config()
-        folder_name = config["shared_folder_name"] if config and "shared_folder_name" in config else DEFAULT_BASE_FOLDER_NAME
+    config = get_google_drive_config()
+    folder_name = config["shared_folder_name"]
     
     query = f"name='{folder_name}' and mimeType='application/vnd.google-apps.folder' and trashed=false"
     results = service.files().list(q=query, spaces='drive', fields='files(id, name)').execute()
@@ -218,59 +211,79 @@ def save_google_drive_report_and_send_messages(setting: dict) -> bool:
         for message in json.loads(setting['send_to']) if isinstance(setting['send_to'], str) else setting['send_to']:
             send_report(file, message['messenger'], message['phone_number'])
         
-        # Create MessageReport objects
+        # Group messages by sender_id
+        messages_by_sender = defaultdict(list)
         for message in pending_messages:
-            user_id = message["sender_id"]
-            
+            sender_id = message["sender_id"]
+            messages_by_sender[sender_id].append(message)
+        
+        # Process each sender's messages as a group
+        for sender_id, sender_messages in messages_by_sender.items():
             # Create user directory on Google Drive
-            user_dir_name = str(user_id)
+            user_dir_name = str(sender_id)
             user_dir_id = create_folder(service, user_dir_name, messages_dir_id)
             
-            # 5. Save message files in Google Drive
-            # Save raw text directly from memory
-            raw_text = message["original_message_text"]
+            # 1. Aggregate original_message_text with [SEP] separators
+            aggregated_text = ""
+            for i, message in enumerate(sender_messages):
+                if i > 0:
+                    aggregated_text += "\n[SEP]\n"
+                aggregated_text += message["original_message_text"]
+            
+            # Save aggregated raw text
             upload_file(
                 service,
-                raw_text.encode('utf-8'),
+                aggregated_text.encode('utf-8'),
                 "raw_text.txt",
                 user_dir_id,
                 'text/plain'
             )
             
-            # Save formatted text directly from memory
-            formatted_text = message["formatted_message_text"]
+            # 2. Aggregate formatted_message_text JSON objects
+            aggregated_json = {}
+            for message in sender_messages:
+                message_json = json.loads(message["formatted_message_text"])
+                for field, value in message_json.items():
+                    if field not in aggregated_json:
+                        aggregated_json[field] = [value]
+                    else:
+                        aggregated_json[field].append(value)
+            
+            # Save aggregated formatted text
             upload_file(
                 service,
-                formatted_text.encode('utf-8'),
+                json.dumps(aggregated_json).encode('utf-8'),
                 "formatted_text.json",
                 user_dir_id,
                 'application/json'
             )
             
-            # Handle extra data (like images) if they exist
-            extra_data = json.loads(message["extra"] if message["extra"] else "{}")
-            if extra_data and "image" in extra_data:
-                image_data = extra_data["image"]
-                
-                # Save the base64 encoded image
-                if "data" in image_data:
-                    try:
-                        image_binary, image_extension = get_image_binary_from_base64(image_data["data"])
-                        
-                        # Upload image directly from memory
-                        mime_type = f"image/{image_extension}" if image_extension != "jpg" else "image/jpeg"
-                        upload_file(
-                            service,
-                            image_binary,
-                            f"image.{image_extension}",
-                            user_dir_id,
-                            mime_type
-                        )
-                    except Exception as e:
-                        logger.error(f"Error saving image: {e}")
+            # Handle extra data (like images) from all messages
+            for i, message in enumerate(sender_messages):
+                extra_data = json.loads(message["extra"] if message["extra"] else "{}")
+                if extra_data and "image" in extra_data:
+                    image_data = extra_data["image"]
+                    
+                    # Save the base64 encoded image with index to keep them separate
+                    if "data" in image_data:
+                        try:
+                            image_binary, image_extension = get_image_binary_from_base64(image_data["data"])
+                            
+                            # Upload image directly from memory with index suffix
+                            mime_type = f"image/{image_extension}" if image_extension != "jpg" else "image/jpeg"
+                            upload_file(
+                                service,
+                                image_binary,
+                                f"image_{i}.{image_extension}",
+                                user_dir_id,
+                                mime_type
+                            )
+                        except Exception as e:
+                            logger.error(f"Error saving image: {e}")
             
-            # Create MessageReport record
-            save_message_report_to_db(message, report_id, conn)
+            # Create MessageReport records for each original message
+            for message in sender_messages:
+                save_message_report_to_db(message, report_id, conn)
         
         # 6. Delete previous messages_pending for this setting
         delete_pending_messages(setting_id, conn)

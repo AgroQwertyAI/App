@@ -7,8 +7,8 @@ import io
 from src.session import get_session
 import logging
 from src.newsletter import send_report
+from collections import defaultdict
 from pathlib import Path
-
 from src.generating_reports.helper import (
     get_pending_messages, 
     aggregate_messages, 
@@ -21,19 +21,15 @@ from src.generating_reports.helper import (
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-# Define the path for storing the token
-OAUTH_CONFIG_DIR = Path("config")
-OAUTH_CONFIG_FILE = OAUTH_CONFIG_DIR / "yandex_oauth.json"
+OAUTH_CONFIG_DIR = Path("/app/config")
+CONFIG_FILE_YANDEX_DISK = OAUTH_CONFIG_DIR / "yandex_oauth.json"
 
 
-def get_oauth_token():
-    """Get the OAuth token from the configuration file."""
-    if OAUTH_CONFIG_FILE.exists():
-        with open(OAUTH_CONFIG_FILE, "r") as f:
-            data = json.load(f)
-            return data.get("token")
-    else:
-        return None
+def get_yandex_disk_config():
+    """Get the full Yandex Disk configuration data."""
+    with open(CONFIG_FILE_YANDEX_DISK, "r") as f:
+        data = json.load(f)
+    return data
 
 
 def save_yandex_disk_report_and_send_messages(setting: dict) -> bool:
@@ -54,22 +50,25 @@ def save_yandex_disk_report_and_send_messages(setting: dict) -> bool:
         report_format = setting["format_report"]
         
         # Get the current OAuth token
-        current_token = get_oauth_token()
+        print(get_yandex_disk_config())
+        current_token = get_yandex_disk_config()["token"]
         if not current_token:
             logger.error("No Yandex OAuth token found")
             raise Exception("No Yandex OAuth token found")
         
         # Initialize YaDisk client
         y = YaDisk(token=current_token)
-        
         # Create report directories on Yandex Disk
         timestamp = datetime.now().strftime('%Y-%m-%d-%H-%M-%S')
-        report_dir = f"/reports/active/{setting_id}/{timestamp}"
+
+        shared_folder_name = get_yandex_disk_config()["shared_folder_name"]
+        report_dir = f"/{shared_folder_name}/reports/active/{setting_id}/{timestamp}"
         messages_dir = f"{report_dir}/messages"
         
-        # Create directories on Yandex Disk
-        y.makedirs(report_dir)
-        y.makedirs(messages_dir)
+        # Create directories on Yandex Disk if do not exist
+        if not y.exists(report_dir):
+            y.makedirs(report_dir)
+            y.makedirs(messages_dir)
         
         # Generate xlsx file
         df = pd.DataFrame(aggregated_data)
@@ -96,43 +95,64 @@ def save_yandex_disk_report_and_send_messages(setting: dict) -> bool:
         for message in json.loads(setting['send_to']) if isinstance(setting['send_to'], str) else setting['send_to']:
             send_report(file, message['messenger'], message['phone_number'])
         
-        # Create MessageReport objects
+        # Group messages by sender_id
+        messages_by_sender = defaultdict(list)
         for message in pending_messages:
-            user_id = message["sender_id"]
-            user_dir = f"{messages_dir}/{user_id}"
+            sender_id = message["sender_id"]
+            messages_by_sender[sender_id].append(message)
+        
+        # Process each sender's messages as a group
+        for sender_id, sender_messages in messages_by_sender.items():
+            user_dir = f"{messages_dir}/{sender_id}"
             
             # Create user directory on Yandex Disk
             y.mkdir(user_dir)
             
-            # 5. Save message files in Yandex Disk
-            # Save raw text directly from memory
-            raw_text = message["original_message_text"]
-            raw_text_buffer = io.BytesIO(raw_text.encode('utf-8'))
+            # 1. Aggregate original_message_text with [SEP] separators
+            aggregated_text = ""
+            for i, message in enumerate(sender_messages):
+                if i > 0:
+                    aggregated_text += "\n[SEP]\n"
+                aggregated_text += message["original_message_text"]
+            
+            # Save aggregated raw text
+            raw_text_buffer = io.BytesIO(aggregated_text.encode('utf-8'))
             y.upload(raw_text_buffer, f"{user_dir}/raw_text.txt")
             
-            # Save formatted text directly from memory
-            formatted_text = message["formatted_message_text"]
-            formatted_text_buffer = io.BytesIO(formatted_text.encode('utf-8'))
+            # 2. Aggregate formatted_message_text JSON objects
+            aggregated_json = {}
+            for message in sender_messages:
+                message_json = json.loads(message["formatted_message_text"])
+                for field, value in message_json.items():
+                    if field not in aggregated_json:
+                        aggregated_json[field] = [value]
+                    else:
+                        aggregated_json[field].append(value)
+            
+            # Save aggregated formatted text
+            formatted_text_buffer = io.BytesIO(json.dumps(aggregated_json).encode('utf-8'))
             y.upload(formatted_text_buffer, f"{user_dir}/formatted_text.json")
             
-            # Handle extra data (like images) if they exist
-            extra_data = json.loads(message["extra"] if message["extra"] else "{}")
-            if extra_data and "image" in extra_data:
-                image_data = extra_data["image"]
-                
-                # Save the base64 encoded image
-                if "data" in image_data:
-                    try:
-                        image_binary, image_extension = get_image_binary_from_base64(image_data["data"])
-                        
-                        # Upload image directly from memory
-                        image_buffer = io.BytesIO(image_binary)
-                        y.upload(image_buffer, f"{user_dir}/image.{image_extension}")
-                    except Exception as e:
-                        logger.error(f"Error saving image: {e}")
+            # Handle extra data (like images) from all messages
+            for i, message in enumerate(sender_messages):
+                extra_data = json.loads(message["extra"] if message["extra"] else "{}")
+                if extra_data and "image" in extra_data:
+                    image_data = extra_data["image"]
+                    
+                    # Save the base64 encoded image with index to keep them separate
+                    if "data" in image_data:
+                        try:
+                            image_binary, image_extension = get_image_binary_from_base64(image_data["data"])
+                            
+                            # Upload image directly from memory with index suffix
+                            image_buffer = io.BytesIO(image_binary)
+                            y.upload(image_buffer, f"{user_dir}/image_{i}.{image_extension}")
+                        except Exception as e:
+                            logger.error(f"Error saving image: {e}")
             
-            # Create MessageReport record
-            save_message_report_to_db(message, report_id, conn)
+            # Create MessageReport records for each original message
+            for message in sender_messages:
+                save_message_report_to_db(message, report_id, conn)
         
         # 6. Delete previous messages_pending for this setting
         delete_pending_messages(setting_id, conn)
@@ -142,21 +162,22 @@ def save_yandex_disk_report_and_send_messages(setting: dict) -> bool:
 def move_yandex_disk_report_to_deleted(setting_id: int):
     try:
         # Get the current OAuth token
-        current_token = get_oauth_token()
+        current_token = get_yandex_disk_config()["token"]
         
         # Initialize YaDisk client
         y = YaDisk(token=current_token)
-        
+
+        shared_folder_name = get_yandex_disk_config()["shared_folder_name"]
         # Define source and target paths
-        source_path = f"/reports/active/{setting_id}"
-        target_path = f"/reports/deleted/{setting_id}"
+        source_path = f"/{shared_folder_name}/reports/active/{setting_id}"
+        target_path = f"/{shared_folder_name}/reports/deleted/{setting_id}"
         
         # Check if source path exists
         if y.exists(source_path):
             # Make sure target parent directory exists
-            if not y.exists("/reports/deleted"):
-                y.mkdir("/reports/deleted")
-                logger.info("Created /reports/deleted directory")
+            if not y.exists(f"{shared_folder_name}/reports/deleted"):
+                y.mkdir(f"{shared_folder_name}/reports/deleted")
+                logger.info(f"Created {shared_folder_name}/reports/deleted directory")
                 
             # Move the directory
             y.move(source_path, target_path, overwrite=True)
