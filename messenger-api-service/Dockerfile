@@ -1,17 +1,13 @@
 FROM python:3.12
 
-# Install cron
-RUN apt-get update && \
-    apt-get install -y cron && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y build-essential cmake git wget ffmpeg
 
-# Create cron directory with correct permissions
-RUN mkdir -p /var/spool/cron/crontabs && \
-    chmod -R 0644 /var/spool/cron && \
-    chmod -R 1730 /var/spool/cron/crontabs
+RUN git clone https://github.com/ggml-org/whisper.cpp.git
+WORKDIR /whisper.cpp
+RUN cmake -B build
+RUN cmake --build build --config Release
+RUN sh ./models/download-ggml-model.sh tiny
 
-# Set working directory
 WORKDIR /app
 
 # Copy dependency files
@@ -21,10 +17,9 @@ RUN pip install -e .
 
 # Copy the rest of the application
 COPY . .
-COPY start.sh /start.sh
-RUN chmod +x /start.sh
+
 # Expose port
-EXPOSE 8005
+EXPOSE 7999
 
 # Command to run the application using the startup script
-CMD ["/start.sh"]
+CMD ["python", "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "7999", "--reload"]

@@ -3,12 +3,15 @@ from typing import Literal, Optional
 
 class MessagePayload(BaseModel):
     message_id: str
-    source_name: str
+    source_name: Literal['telegram'] = 'telegram'
     chat_id: str
-    text: str
+    text: str | None = None
     sender_id: Optional[str] = None
-    sender_name: str
-    image: Optional[str] = Field(default=None)
+    sender_name: str | None = None
+    is_private: bool
+
+    audio: Optional[str] = Field(default=None)
+    images: list[str] = Field(default=[])
 
 class ChatRegistrationSchema(BaseModel):
     chat_id: str

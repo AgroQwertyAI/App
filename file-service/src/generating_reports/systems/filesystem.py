@@ -94,32 +94,28 @@ def save_filesystem_report_and_send_messages(setting: dict) -> bool:
             aggregated_json = {}
             for message in sender_messages:
                 message_json = json.loads(message["formatted_message_text"])
-                for field, value in message_json.items():
+                for field, values in message_json.items():
                     if field not in aggregated_json:
-                        aggregated_json[field] = [value]
-                    else:
-                        aggregated_json[field].append(value)
+                        aggregated_json[field] = []
+                    aggregated_json[field].extend(values)
             
             # Save aggregated formatted text
             with open(f"{user_dir}/formatted_text.json", "w") as f:
                 f.write(json.dumps(aggregated_json))
 
-            # Handle extra data (like images) from all messages
-            for i, message in enumerate(sender_messages):
-                extra_data = json.loads(message["extra"] if message["extra"] else "{}")
-                if extra_data and "image" in extra_data:
-                    image_data = extra_data["image"]
-                    
+            # Handle images from all messages
+            for message in sender_messages:
+                images = json.loads(message["images"]) if message["images"] else {"images": []}
+                for i, image in enumerate(images["images"]):
                     # Save the base64 encoded image with index to keep them separate
-                    if "data" in image_data:
-                        try:
-                            image_binary, image_extension = get_image_binary_from_base64(image_data["data"])
-                            
-                            # Write binary data to file with index suffix
-                            with open(f"{user_dir}/image_{i}.{image_extension}", "wb") as f:
-                                f.write(image_binary)
-                        except Exception as e:
-                            logger.error(f"Error saving image: {e}")
+                    try:
+                        image_binary, image_extension = get_image_binary_from_base64(image)
+                        
+                        # Write binary data to file with index suffix
+                        with open(f"{user_dir}/image_{i}.{image_extension}", "wb") as f:
+                            f.write(image_binary)
+                    except Exception as e:
+                        logger.error(f"Error saving image: {e}")
 
             # Create MessageReport records for each original message
             for message in sender_messages:

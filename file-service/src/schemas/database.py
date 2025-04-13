@@ -17,6 +17,8 @@ class MessagePending(Base):
     original_message_text = Column(Text, nullable=False)
     formatted_message_text = Column(JSON, nullable=False)
     
+    images = Column(JSON, nullable=False)
+    
     timedata = Column(DateTime, nullable=False)
     
     extra = Column(JSON, nullable=True)
@@ -80,6 +82,8 @@ class MessageReport(Base):
     timedata = Column(DateTime, nullable=False)
     original_message_text = Column(Text, nullable=False)
     formatted_message_text = Column(JSON, nullable=False)
+
+    images = Column(JSON, nullable=False)
     
     extra = Column(JSON, nullable=True)
     

@@ -4,13 +4,13 @@ services:
       context: ./messenger-api-service
       dockerfile: Dockerfile
     ports:
-      - "8005:8005"
+      - "7999:7999"
     volumes:
       - ./messenger-api-service:/app
-      - ./database:/messenger_api_service_database
-      - messenger_api_service_cron_config:/var/spool/cron
     environment:
       - PYTHONUNBUFFERED=1
+    env_file:
+      - ./.env
     restart: unless-stopped
     networks:
       - app-network
@@ -23,31 +23,19 @@ services:
       - "8000:8000"
     volumes:
       - ./file-service:/app
-      - file_service_local_files:/app/src/reports
+      - file_service_local_files:/reports
       - file_service_cron_config:/var/spool/cron
+      - file_service_database:/data
+      - file_service_config:/config
     environment:
       - PYTHONUNBUFFERED=1
-    restart: unless-stopped
-    networks:
-      - app-network
-
-  data-presentation:
-    build:
-      context: ./data-presentation
-      dockerfile: Dockerfile
-    ports:
-      - "52003:52003"
-    volumes:
-      - ./data-presentation:/app
     env_file:
-      - ./data-presentation/.env
-    environment:
-      - PYTHONUNBUFFERED=1
+      - ./.env
     restart: unless-stopped
     networks:
       - app-network
 
-  message-processing:
+  message-processing-service:
     build:
       context: ./message-processing-service
       dockerfile: Dockerfile
@@ -56,15 +44,12 @@ services:
     volumes:
       - ./message-processing-service:/app
     env_file:
-      - ./message-processing-service/.env
+      - ./.env
     environment:
       - PYTHONUNBUFFERED=1
-      - DATA_SERVICE_URL=http://host.docker.internal:3000
     restart: unless-stopped
     networks:
       - app-network
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
 
 networks:
   app-network:
@@ -72,5 +57,6 @@ networks:
 
 volumes:
   file_service_local_files:
-  messenger_api_service_cron_config:
   file_service_cron_config:
+  file_service_database:
+  file_service_config:

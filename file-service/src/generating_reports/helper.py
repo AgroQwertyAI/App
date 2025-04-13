@@ -16,10 +16,10 @@ def aggregate_messages(pending_messages: list[dict]) -> dict:
     aggregated_data = {}
     for message in pending_messages:
         formatted_data = json.loads(message["formatted_message_text"])
-        for key, value in formatted_data.items():
+        for key, values in formatted_data.items():
             if key not in aggregated_data:
                 aggregated_data[key] = []
-            aggregated_data[key].append(value)
+            aggregated_data[key].extend(values)
 
     return aggregated_data
 
@@ -58,8 +58,8 @@ def save_message_report_to_db(pending_message: dict, report_id: int, conn: Conne
         INSERT INTO message_reports (
             sender_phone_number, sender_name, sender_id, 
             setting_id, report_id, timedata, 
-            original_message_text, formatted_message_text, extra
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            original_message_text, formatted_message_text, images, extra
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             pending_message["sender_phone_number"],
@@ -70,6 +70,7 @@ def save_message_report_to_db(pending_message: dict, report_id: int, conn: Conne
             now,
             pending_message["original_message_text"],
             pending_message["formatted_message_text"],
+            pending_message["images"] if pending_message["images"] else '{"images": []}',
             pending_message["extra"] if pending_message["extra"] else "{}"
         )
     )

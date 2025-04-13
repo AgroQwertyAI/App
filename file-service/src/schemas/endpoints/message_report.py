@@ -1,5 +1,6 @@
 from pydantic import Field, BaseModel
 from datetime import datetime
+from src.schemas.other.images import Images
 
 class MessageReportGet(BaseModel):
     message_id: int = Field(description="The unique identifier of the message")
@@ -14,7 +15,11 @@ class MessageReportGet(BaseModel):
     original_message_text: str = Field(description="The original text of the message")
     formatted_message_text: dict = Field(
         description="The formatted json of the message", 
-        example={"field1": "value1", "field2": "value2"}
+        example={"field1": ["value1", "value2"], "field2": ["value3", "value4"]}
     )
 
-    extra: dict = Field(description="The extra information about the message", example={"image": "base64,<image>"})
+    timedata: datetime = Field(description="The timedata of the message")
+
+    images: Images = Field(description="The images of the message")
+
+    extra: dict = Field(description="The extra information about the message")

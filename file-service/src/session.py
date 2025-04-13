@@ -4,7 +4,7 @@ from contextlib import contextmanager
 from typing import Generator
 
 # Database file path - adjust as needed
-DEFAULT_DB_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "database.sqlite")
+DEFAULT_DB_PATH = os.path.join("data", "database.sqlite")
 
 def _ensure_db_directory(db_path: str) -> None:
     """Ensure the directory for the database file exists"""

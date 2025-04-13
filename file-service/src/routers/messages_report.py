@@ -63,6 +63,7 @@ async def get_messages_from_report(
                 original_message_text=message["original_message_text"],
                 formatted_message_text=json.loads(message["formatted_message_text"]) if isinstance(message["formatted_message_text"], str) else message["formatted_message_text"],
                 timedata=message["timedata"],
+                images=json.loads(message["images"]) if message["images"] else {"images": []},
                 extra=json.loads(message["extra"]) if message["extra"] and isinstance(message["extra"], str) else (message["extra"] or {})
             )
             for message in messages

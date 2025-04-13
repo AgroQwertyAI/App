@@ -24,9 +24,9 @@ agents = {}
 
 # Environment variables
 API_PORT = int(os.getenv("API_PORT", 8001))
-# Ensure DATA_SERVICE_URL points to the base URL of your Next.js app (e.g., http://localhost:3000)
-DATA_SERVICE_URL = os.getenv("DATA_SERVICE_URL", "http://localhost:3000")
-LLM_SERVICE_URL = os.getenv("LLM_SERVICE_URL", "http://127.0.0.1:6325/v1/chat/completions")
+# Ensure FILE_SERVICE_URL points to the base URL of your Next.js app (e.g., http://localhost:3000)
+FILE_SERVICE_URL = os.getenv("FILE_SERVICE_URL", "http://localhost:3000")
+LLM_SERVICE_URL = os.environ["LLM_SERVICE_URL"]
 
 # --- Input Model ---
 class NewMessageRequest(BaseModel):
@@ -49,7 +49,7 @@ async def is_monitoring(chat_id: str) -> bool:
     Checks if a chat should be monitored by querying the Data Service.
     Returns True if the chat is active and should be monitored, False otherwise.
     """
-    url = f"{DATA_SERVICE_URL}/api/chats/{chat_id}"
+    url = f"{FILE_SERVICE_URL}/api/chats/{chat_id}"
     try:
         logger.info(f"Checking monitoring status for chat: {chat_id}")
         async with aiohttp.ClientSession() as session:
@@ -76,7 +76,7 @@ async def startup_event():
     """Initialize the service on startup"""
     # load_config_from_data_service() # Keep if needed, but commented out as per original code
     logger.info("Message Processing Service started.")
-    logger.info(f"Data Service URL: {DATA_SERVICE_URL}")
+    logger.info(f"Data Service URL: {FILE_SERVICE_URL}")
     logger.info(f"LLM Service URL: {LLM_SERVICE_URL}")
 
 

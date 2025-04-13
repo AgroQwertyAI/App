@@ -19,9 +19,9 @@ load_dotenv()
 
 # Environment variables
 API_PORT = int(os.getenv("API_PORT", 8001))
-# Ensure DATA_SERVICE_URL points to the base URL of your Next.js app (e.g., http://localhost:3000)
-DATA_SERVICE_URL = os.getenv("DATA_SERVICE_URL", "http://localhost:3000")
-LLM_SERVICE_URL = os.getenv("LLM_SERVICE_URL", "http://127.0.0.1:6325/v1/chat/completions")
+# Ensure FILE_SERVICE_URL points to the base URL of your Next.js app (e.g., http://localhost:3000)
+FILE_SERVICE_URL = os.environ["FILE_SERVICE_URL"]
+LLM_SERVICE_URL = os.environ["LLM_SERVICE_URL"]
 WHATSAPP_SERVICE_URL = os.getenv("WHATSAPP_SERVICE_URL", "http://localhost:52101")
 
 class DataServicePayload(BaseModel):
@@ -195,7 +195,7 @@ class Agent:
 
     async def send_to_data_service_new_message(self, payload: DataServicePayload):
         """Sends data to the Data Service /api/chats/new_message endpoint."""
-        url = f"{DATA_SERVICE_URL}/api/chats/new_message"
+        url = f"{FILE_SERVICE_URL}/api/chats/new_message"
         try:
             payload_dict = payload.model_dump(exclude_none=True) if hasattr(payload, 'model_dump') else payload.dict(exclude_none=True)
 

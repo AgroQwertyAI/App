@@ -13,7 +13,7 @@ from datetime import datetime
 load_dotenv()
 
 # Service URLs
-DATA_SERVICE_URL = os.getenv("DATA_SERVICE_URL", "http://localhost:3000")
+FILE_SERVICE_URL = os.environ["FILE_SERVICE_URL"]
 
 def get_template_by_id(template_id: str) -> Optional[Dict[Any, Any]]:
     """
@@ -36,7 +36,7 @@ def get_template_by_id(template_id: str) -> Optional[Dict[Any, Any]]:
         
     try:
         # Make GET request to the templates endpoint with ID parameter
-        response = requests.get(f"{DATA_SERVICE_URL}/api/templates", params={"id": template_id})
+        response = requests.get(f"{FILE_SERVICE_URL}/api/templates", params={"id": template_id})
         
         # Check if request was successful
         if response.status_code == 200:
@@ -62,7 +62,7 @@ async def get_template_id(chat_id: str):
     Checks if a chat should be monitored by querying the Data Service.
     Returns True if the chat is active and should be monitored, False otherwise.
     """
-    url = f"{DATA_SERVICE_URL}/api/chats/{chat_id}"
+    url = f"{FILE_SERVICE_URL}/api/chats/{chat_id}"
     try:
         async with aiohttp.ClientSession() as session:
             async with session.get(url) as response:

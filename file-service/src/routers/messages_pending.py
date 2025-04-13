@@ -52,6 +52,7 @@ async def get_messages(
         for message in messages:
             # Parse JSON strings to dictionaries
             formatted_message_text = json.loads(message["formatted_message_text"]) if message["formatted_message_text"] else {}
+            images = json.loads(message["images"]) if message["images"] else {"images": []}
             extra = json.loads(message["extra"]) if message["extra"] else {}
             
             result.append(
@@ -64,6 +65,7 @@ async def get_messages(
                     original_message_text=message["original_message_text"],
                     formatted_message_text=formatted_message_text,
                     timedata=message["timedata"],
+                    images=images,
                     extra=extra
                 )
             )
@@ -97,8 +99,8 @@ async def create_message(
             """
             INSERT INTO messages_pending 
             (sender_phone_number, sender_name, sender_id, setting_id, 
-             original_message_text, formatted_message_text, timedata, extra) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+             original_message_text, formatted_message_text, images, timedata, extra) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 message.sender_phone_number,
@@ -107,6 +109,7 @@ async def create_message(
                 setting_id,
                 message.original_message_text,
                 json.dumps(message.formatted_message_text),
+                json.dumps(message.images),
                 current_time,
                 json.dumps(message.extra)
             )
@@ -124,6 +127,7 @@ async def create_message(
             setting_id=setting_id,
             original_message_text=message.original_message_text,
             formatted_message_text=message.formatted_message_text,
+            images=message.images,
             timedata=current_time,
             extra=message.extra
         )
@@ -157,6 +161,7 @@ async def update_message(
         
         # Convert JSON fields to string
         formatted_message_text_json = json.dumps(message_put.formatted_message_text)
+        images_json = json.dumps(message_put.images)
         extra_json = json.dumps(message_put.extra)
         
         # Build the update query
@@ -164,6 +169,7 @@ async def update_message(
         UPDATE messages_pending SET
             original_message_text = ?,
             formatted_message_text = ?,
+            images = ?,
             extra = ?
         WHERE setting_id = ? AND sender_id = ?
         """
@@ -172,6 +178,7 @@ async def update_message(
         cursor.execute(query, (
             message_put.original_message_text,
             formatted_message_text_json,
+            images_json,
             extra_json,
             setting_id,
             sender_id
@@ -190,6 +197,7 @@ async def update_message(
         
         # Parse JSON strings to dictionaries
         formatted_message_text = json.loads(updated_message["formatted_message_text"]) if updated_message["formatted_message_text"] else {}
+        images = json.loads(updated_message["images"]) if updated_message["images"] else {"images": []}
         extra = json.loads(updated_message["extra"]) if updated_message["extra"] else {}
         
         # Return the updated message
@@ -201,6 +209,7 @@ async def update_message(
             setting_id=updated_message["setting_id"],
             original_message_text=updated_message["original_message_text"],
             formatted_message_text=formatted_message_text,
+            images=images,
             timedata=updated_message["timedata"],
             extra=extra
         )

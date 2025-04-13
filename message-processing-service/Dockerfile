@@ -7,18 +7,18 @@ WORKDIR /app
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 
-# Copy pyproject.toml for dependency installation
-COPY pyproject.toml .
+COPY pyproject.toml ./
 
-# Install dependencies
-RUN pip install --upgrade pip && \
-    pip install --no-cache-dir aiohttp fastapi openai pydantic python-dotenv uvicorn
+# Install setuptools first
+RUN pip install --upgrade pip setuptools
+
+RUN pip install -e .
 
 # Copy application code
 COPY . .
 
 # Expose the port the app runs on
-EXPOSE ${API_PORT:-8001}
+EXPOSE 8001
 
 # Command to run the application with hot reload
-CMD uvicorn main:app --host 0.0.0.0 --port ${API_PORT:-8001} --reload 
+CMD ["python", "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8001", "--reload"]

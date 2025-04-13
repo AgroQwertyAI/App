@@ -2,12 +2,12 @@ import os
 from openai import AsyncOpenAI
 from typing import List, Dict, Any, Optional
 
-LLM_SERVICE_URL = os.environ.get("LLM_SERVICE_URL", "http://37.194.195.213:6325/v1")
+LLM_SERVICE_URL = os.environ["LLM_SERVICE_URL"]
 
 print("URI" + LLM_SERVICE_URL)
 
 client = AsyncOpenAI(
-    base_url= "http://37.194.195.213:6325/v1",
+    base_url=LLM_SERVICE_URL,
     api_key="nova-proxy"
 )
 

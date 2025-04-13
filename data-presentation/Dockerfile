@@ -28,7 +28,7 @@ RUN pip install --upgrade pip && \
 COPY . .
 
 # Expose the port the app runs on
-EXPOSE ${API_PORT:-52003}
+EXPOSE 52003
 
 # Command to run the application with hot reload
-CMD uvicorn main:app --host 0.0.0.0 --port ${API_PORT:-52003} --reload 
+CMD uvicorn main:app --host 0.0.0.0 --port 52003 --reload 

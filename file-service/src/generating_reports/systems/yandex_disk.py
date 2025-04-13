@@ -21,7 +21,7 @@ from src.generating_reports.helper import (
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-OAUTH_CONFIG_DIR = Path("/app/config")
+OAUTH_CONFIG_DIR = Path("/config")
 CONFIG_FILE_YANDEX_DISK = OAUTH_CONFIG_DIR / "yandex_oauth.json"
 
 
