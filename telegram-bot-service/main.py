@@ -1,4 +1,3 @@
-import logging
 from src.config import TELEGRAM_API_KEY
 
 from src.handlers import (
@@ -8,9 +7,6 @@ from src.handlers import (
     cleanup_expired_media_groups,
 )
 from telegram.ext import Application, MessageHandler, filters, ChatMemberHandler
-
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
 
 if __name__ == "__main__":
     token = TELEGRAM_API_KEY

@@ -2,10 +2,7 @@ from fastapi import APIRouter, HTTPException
 from src.schemas.llm_processing import LLMProcessingPayloadPost, LLMProcessingPayloadPostResponse
 import httpx
 from src.whisper import transcribe_audio
-import logging
-from src.config import MESSAGE_PROCESSING_SERVICE_URL
-
-logger = logging.getLogger(__name__)
+from src.config import MESSAGE_PROCESSING_SERVICE_URL, logger
 
 llm_processing_router = APIRouter(tags=["LLM Processing"])
 
@@ -15,6 +12,7 @@ llm_processing_router = APIRouter(tags=["LLM Processing"])
     description="Process message received from messenger and send it to message processing service",
 )
 async def llm_processing(payload: LLMProcessingPayloadPost):
+    logger.info(f"Received message from messenger: {payload.message_id}")
     if payload.audio:
         transcribed_text = transcribe_audio(payload.audio)
 

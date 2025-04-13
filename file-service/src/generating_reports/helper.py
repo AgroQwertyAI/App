@@ -55,7 +55,7 @@ def save_message_report_to_db(pending_message: dict, report_id: int, conn: Conne
     now = datetime.now().isoformat()
     cursor.execute(
         """
-        INSERT INTO message_reports (
+        INSERT INTO messages_reports (
             sender_phone_number, sender_name, sender_id, 
             setting_id, report_id, timedata, 
             original_message_text, formatted_message_text, images, extra

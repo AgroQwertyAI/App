@@ -1,10 +1,8 @@
 import aiohttp
-import logging
+from src.config import logger
 from src.config import MESSENGER_API_SERVICE_URL
 from src.schemas import MessagePayload, ChatRegistrationSchema
 import base64
-
-logger = logging.getLogger(__name__)
 
 async def register_chat(chat_registration: ChatRegistrationSchema) -> None:
     logger.info(f"Registering chat {chat_registration.chat_id} with name {chat_registration.chat_name}")
@@ -30,7 +28,7 @@ async def unregister_chat(chat_id: str) -> None:
 
 
 async def send_new_message(message: MessagePayload) -> None:
-    logger.info(f"Sending new message: {message}")
+    logger.info(f"Sending new message: {message.message_id}")
     async with aiohttp.ClientSession() as session:
         async with session.post(
             f"{MESSENGER_API_SERVICE_URL}/api/llm_processing", 

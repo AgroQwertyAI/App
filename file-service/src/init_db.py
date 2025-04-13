@@ -19,6 +19,7 @@ def create_tables():
 
 def init_db():
     """Initialize the database"""
+    logger.info("Initializing database...")
     try:
         # Ensure the database directory exists
         db_dir = os.path.dirname(DEFAULT_DB_PATH)

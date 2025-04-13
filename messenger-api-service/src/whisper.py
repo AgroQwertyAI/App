@@ -3,6 +3,7 @@ import tempfile
 import subprocess
 import os
 from pydub import AudioSegment
+from src.config import logger
 
 def transcribe_audio(audio_base64: str) -> str:
     """

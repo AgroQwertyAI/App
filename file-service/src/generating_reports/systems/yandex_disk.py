@@ -5,7 +5,7 @@ import pandas as pd
 import base64
 import io
 from src.session import get_session
-import logging
+from src.config import logger
 from src.newsletter import send_report
 from collections import defaultdict
 from pathlib import Path
@@ -17,9 +17,6 @@ from src.generating_reports.helper import (
     save_message_report_to_db,
     delete_pending_messages
 )
-
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(__name__)
 
 OAUTH_CONFIG_DIR = Path("/config")
 CONFIG_FILE_YANDEX_DISK = OAUTH_CONFIG_DIR / "yandex_oauth.json"
@@ -35,7 +32,8 @@ def get_yandex_disk_config():
 def save_yandex_disk_report_and_send_messages(setting: dict) -> bool:
     # Extract setting ID from the setting dictionary
     setting_id = setting["setting_id"]
-    
+    logger.info(f"Saving report and sending messages for setting {setting_id}")
+
     with get_session() as conn:
         # 1. Fetch all pending messages associated with the setting
         pending_messages = get_pending_messages(setting_id, conn)
@@ -133,22 +131,21 @@ def save_yandex_disk_report_and_send_messages(setting: dict) -> bool:
             formatted_text_buffer = io.BytesIO(json.dumps(aggregated_json).encode('utf-8'))
             y.upload(formatted_text_buffer, f"{user_dir}/formatted_text.json")
             
-            # Handle extra data (like images) from all messages
-            for i, message in enumerate(sender_messages):
-                extra_data = json.loads(message["extra"] if message["extra"] else "{}")
-                if extra_data and "image" in extra_data:
-                    image_data = extra_data["image"]
-                    
+            # Handle images from all messages
+            i = 0
+            for message in sender_messages:
+                images = json.loads(message["images"]) if message["images"] else {"images": []}
+                for image in images["images"]:
                     # Save the base64 encoded image with index to keep them separate
-                    if "data" in image_data:
-                        try:
-                            image_binary, image_extension = get_image_binary_from_base64(image_data["data"])
-                            
-                            # Upload image directly from memory with index suffix
-                            image_buffer = io.BytesIO(image_binary)
-                            y.upload(image_buffer, f"{user_dir}/image_{i}.{image_extension}")
-                        except Exception as e:
-                            logger.error(f"Error saving image: {e}")
+                    try:
+                        image_binary, image_extension = get_image_binary_from_base64(image)
+                        
+                        # Upload image directly from memory with index suffix
+                        image_buffer = io.BytesIO(image_binary)
+                        y.upload(image_buffer, f"{user_dir}/image_{i}.{image_extension}")
+                        i += 1
+                    except Exception as e:
+                        logger.error(f"Error saving image: {e}")
             
             # Create MessageReport records for each original message
             for message in sender_messages:

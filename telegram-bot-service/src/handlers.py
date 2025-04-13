@@ -1,4 +1,4 @@
-import logging
+from src.config import logger
 from telegram import Update
 from telegram.ext import ContextTypes
 from src.schemas import MessagePayload, ChatRegistrationSchema
@@ -10,9 +10,6 @@ from src.auxiliary import (
     get_blob_photo,
     get_blob_voice,
 )
-
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
 
 
 async def cleanup_expired_media_groups(context: ContextTypes.DEFAULT_TYPE):
@@ -96,6 +93,7 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def chat_member_join_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    logger.info(f"Chat member join handler called for chat {update.my_chat_member.chat.id}")
     try:
         new_status = update.my_chat_member.new_chat_member.status
         if new_status != 'member':
@@ -107,11 +105,18 @@ async def chat_member_join_handler(update: Update, context: ContextTypes.DEFAULT
 
         chat_registration = ChatRegistrationSchema(chat_id=str(chat_id), chat_name=chat_name)
         await register_chat(chat_registration)
+        
+        # Send welcome message to the chat
+        await context.bot.send_message(
+            chat_id=chat_id,
+            text="Привет! Я зафиксировал добавление в чат!"
+        )
     except Exception as e:
-        logger.error(f"Error in chat_member_handler: {e}")
+        logger.error(f"Error in chat_member_join_handler: {e}")
 
 
 async def chat_member_left_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    logger.info(f"Chat member left handler called for chat {update.my_chat_member.chat.id}")
     try:
         new_status = update.my_chat_member.new_chat_member.status
         if new_status not in ['left', 'kicked']:

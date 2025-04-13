@@ -10,17 +10,7 @@ from src.session import get_session
 from src.generating_reports.systems.filesystem import save_filesystem_report_and_send_messages
 from src.generating_reports.systems.yandex_disk import save_yandex_disk_report_and_send_messages
 from src.generating_reports.systems.google_drive import save_google_drive_report_and_send_messages
-import logging
-
-# Set up logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.StreamHandler()
-    ]
-)
-logger = logging.getLogger("save_report")
+from src.config import logger
 
 def save_report(setting_id: int):
     """

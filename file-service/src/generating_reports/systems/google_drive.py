@@ -7,7 +7,6 @@ import pandas as pd
 import base64
 import io
 from src.session import get_session
-import logging
 from src.newsletter import send_report
 from pathlib import Path
 import tempfile
@@ -21,11 +20,9 @@ from src.generating_reports.helper import (
     delete_pending_messages
 )
 from collections import defaultdict
+from src.config import logger
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(__name__)
-
-OAUTH_CONFIG_DIR = Path("/app/config")
+OAUTH_CONFIG_DIR = Path("app", "config")
 CONFIG_FILE_GOOGLE_DRIVE = OAUTH_CONFIG_DIR / "google_drive_credentials.json"
 
 def get_google_drive_config():
@@ -138,7 +135,8 @@ def find_shared_folder(service):
 def save_google_drive_report_and_send_messages(setting: dict) -> bool:
     # Extract setting ID from the setting dictionary
     setting_id = setting["setting_id"]
-    
+    logger.info(f"Saving report and sending messages for setting {setting_id}")
+
     with get_session() as conn:
         # 1. Fetch all pending messages associated with the setting
         pending_messages = get_pending_messages(setting_id, conn)
@@ -258,28 +256,27 @@ def save_google_drive_report_and_send_messages(setting: dict) -> bool:
                 'application/json'
             )
             
-            # Handle extra data (like images) from all messages
-            for i, message in enumerate(sender_messages):
-                extra_data = json.loads(message["extra"] if message["extra"] else "{}")
-                if extra_data and "image" in extra_data:
-                    image_data = extra_data["image"]
-                    
+            # Handle images from all messages
+            i = 0
+            for message in sender_messages:
+                images = json.loads(message["images"]) if message["images"] else {"images": []}
+                for image in images["images"]:
                     # Save the base64 encoded image with index to keep them separate
-                    if "data" in image_data:
-                        try:
-                            image_binary, image_extension = get_image_binary_from_base64(image_data["data"])
-                            
-                            # Upload image directly from memory with index suffix
-                            mime_type = f"image/{image_extension}" if image_extension != "jpg" else "image/jpeg"
-                            upload_file(
-                                service,
-                                image_binary,
-                                f"image_{i}.{image_extension}",
-                                user_dir_id,
-                                mime_type
-                            )
-                        except Exception as e:
-                            logger.error(f"Error saving image: {e}")
+                    try:
+                        image_binary, image_extension = get_image_binary_from_base64(image)
+                        
+                        # Upload image directly from memory with index suffix
+                        mime_type = f"image/{image_extension}" if image_extension != "jpg" else "image/jpeg"
+                        upload_file(
+                            service,
+                            image_binary,
+                            f"image_{i}.{image_extension}",
+                            user_dir_id,
+                            mime_type
+                        )
+                        i += 1
+                    except Exception as e:
+                        logger.error(f"Error saving image: {e}")
             
             # Create MessageReport records for each original message
             for message in sender_messages:

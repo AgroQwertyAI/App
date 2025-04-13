@@ -5,11 +5,11 @@ import pandas as pd
 import base64
 import io
 from src.session import get_session
-import logging
 from datetime import datetime
 from src.newsletter import send_report
 import shutil
 from collections import defaultdict
+from src.config import logger
 from src.generating_reports.helper import (
     get_pending_messages, 
     aggregate_messages, 
@@ -19,12 +19,10 @@ from src.generating_reports.helper import (
     delete_pending_messages
 )
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(__name__)
-
 def save_filesystem_report_and_send_messages(setting: dict) -> bool:
     # Extract setting ID from the setting dictionary
     setting_id = setting["setting_id"]
+    logger.info(f"Saving report and sending messages for setting {setting_id}")
 
     with get_session() as conn:
         # 1. Fetch all pending messages associated with the setting
@@ -104,9 +102,10 @@ def save_filesystem_report_and_send_messages(setting: dict) -> bool:
                 f.write(json.dumps(aggregated_json))
 
             # Handle images from all messages
+            i = 0
             for message in sender_messages:
                 images = json.loads(message["images"]) if message["images"] else {"images": []}
-                for i, image in enumerate(images["images"]):
+                for image in images["images"]:
                     # Save the base64 encoded image with index to keep them separate
                     try:
                         image_binary, image_extension = get_image_binary_from_base64(image)
@@ -114,6 +113,8 @@ def save_filesystem_report_and_send_messages(setting: dict) -> bool:
                         # Write binary data to file with index suffix
                         with open(f"{user_dir}/image_{i}.{image_extension}", "wb") as f:
                             f.write(image_binary)
+                            
+                        i += 1
                     except Exception as e:
                         logger.error(f"Error saving image: {e}")
 

@@ -95,6 +95,12 @@ async def create_message(
         
         # Insert the new message
         current_time = datetime.now(timezone.utc).isoformat()
+        
+        # Convert images to a serializable format if it's an object
+        images_data = message.images
+        if hasattr(images_data, "__dict__"):
+            images_data = images_data.__dict__
+        
         cursor.execute(
             """
             INSERT INTO messages_pending 
@@ -109,7 +115,7 @@ async def create_message(
                 setting_id,
                 message.original_message_text,
                 json.dumps(message.formatted_message_text),
-                json.dumps(message.images),
+                json.dumps(images_data),
                 current_time,
                 json.dumps(message.extra)
             )
@@ -161,8 +167,12 @@ async def update_message(
         
         # Convert JSON fields to string
         formatted_message_text_json = json.dumps(message_put.formatted_message_text)
-        images_json = json.dumps(message_put.images)
         extra_json = json.dumps(message_put.extra)
+        
+        # Convert images to a serializable format if it's an object
+        images_data = message_put.images
+        if hasattr(images_data, "__dict__"):
+            images_data = images_data.__dict__
         
         # Build the update query
         query = """
@@ -178,7 +188,7 @@ async def update_message(
         cursor.execute(query, (
             message_put.original_message_text,
             formatted_message_text_json,
-            images_json,
+            json.dumps(images_data),
             extra_json,
             setting_id,
             sender_id

@@ -2,9 +2,7 @@ import os
 import sys
 from crontab import CronTab
 from src.schemas.endpoints.setting import SettingPost
-import logging
-
-logger = logging.getLogger(__name__)
+from src.config import logger
 
 # Path to the cron configuration directory
 CRON_CONFIG_DIR = "/var/spool/cron/crontabs"
