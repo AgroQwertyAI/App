@@ -140,7 +140,7 @@ async def create_message(
 
 
 @message_pending_router.put(
-    "/setting/{setting_id}/message_pending/{sender_id}", 
+    "/setting/{setting_id}/message_pending/{message_id}", 
     response_model=MessagePendingGet, 
     description="Update a pending message by its id", 
     responses={404:{
@@ -149,7 +149,7 @@ async def create_message(
 )
 async def update_message(
     setting_id: int, 
-    sender_id: str,
+    message_id: int,
     message_put: MessagePendingPut
 ):
     with get_session() as conn:
@@ -157,13 +157,13 @@ async def update_message(
         
         # Check if message exists
         cursor.execute(
-            "SELECT * FROM messages_pending WHERE setting_id = ? AND sender_id = ?", 
-            (setting_id, sender_id)
+            "SELECT * FROM messages_pending WHERE setting_id = ? AND message_id = ?", 
+            (setting_id, message_id)
         )
         message = cursor.fetchone()
         
         if not message:
-            raise HTTPException(status_code=404, detail=f"Message not found for setting ID {setting_id} and sender ID {sender_id}")
+            raise HTTPException(status_code=404, detail=f"Message not found for setting ID {setting_id} and message ID {message_id}")
         
         # Convert JSON fields to string
         formatted_message_text_json = json.dumps(message_put.formatted_message_text)
@@ -181,7 +181,7 @@ async def update_message(
             formatted_message_text = ?,
             images = ?,
             extra = ?
-        WHERE setting_id = ? AND sender_id = ?
+        WHERE setting_id = ? AND message_id = ?
         """
         
         # Execute the update
@@ -191,7 +191,7 @@ async def update_message(
             json.dumps(images_data),
             extra_json,
             setting_id,
-            sender_id
+            message_id
         ))
         
         # Check if the update was successful
@@ -200,8 +200,8 @@ async def update_message(
         
         # Get the updated message
         cursor.execute(
-            "SELECT * FROM messages_pending WHERE setting_id = ? AND sender_id = ?", 
-            (setting_id, sender_id)
+            "SELECT * FROM messages_pending WHERE setting_id = ? AND message_id = ?", 
+            (setting_id, message_id)
         )
         updated_message = cursor.fetchone()
         
@@ -226,7 +226,7 @@ async def update_message(
 
 
 @message_pending_router.delete(
-    "/setting/{setting_id}/message_pending/{sender_id}",
+    "/setting/{setting_id}/message_pending/{message_id}",
     response_model=None,
     status_code=204,
     description="Delete a pending message by its id",
@@ -236,25 +236,25 @@ async def update_message(
 )
 async def delete_message(
     setting_id: int,
-    sender_id: str
+    message_id: int
 ):
     with get_session() as conn:
         cursor = conn.cursor()
         
         # Check if message exists
         cursor.execute(
-            "SELECT message_id FROM messages_pending WHERE setting_id = ? AND sender_id = ?", 
-            (setting_id, sender_id)
+            "SELECT message_id FROM messages_pending WHERE setting_id = ? AND message_id = ?", 
+            (setting_id, message_id)
         )
         message = cursor.fetchone()
         
         if not message:
-            raise HTTPException(status_code=404, detail=f"Message not found for setting ID {setting_id} and sender ID {sender_id}")
+            raise HTTPException(status_code=404, detail=f"Message not found for setting ID {setting_id} and message ID {message_id}")
         
         # Delete the message
         cursor.execute(
-            "DELETE FROM messages_pending WHERE setting_id = ? AND sender_id = ?", 
-            (setting_id, sender_id)
+            "DELETE FROM messages_pending WHERE setting_id = ? AND message_id = ?", 
+            (setting_id, message_id)
         )
         
         # Check if the deletion was successful
