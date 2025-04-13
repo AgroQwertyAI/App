@@ -11,7 +11,6 @@ services:
       - PYTHONUNBUFFERED=1
     env_file:
       - ./.env
-    restart: unless-stopped
     networks:
       - app-network
 
@@ -31,7 +30,6 @@ services:
       - PYTHONUNBUFFERED=1
     env_file:
       - ./.env
-    restart: unless-stopped
     networks:
       - app-network
 
@@ -47,7 +45,19 @@ services:
       - ./.env
     environment:
       - PYTHONUNBUFFERED=1
-    restart: unless-stopped
+    networks:
+      - app-network
+
+  telegram-bot-service:
+    build:
+      context: ./telegram-bot-service
+      dockerfile: Dockerfile
+    env_file:
+      - ./.env
+    volumes:
+      - ./telegram-bot-service:/app
+    environment:
+      - PYTHONUNBUFFERED=1
     networks:
       - app-network
 

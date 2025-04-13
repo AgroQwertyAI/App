@@ -12,8 +12,8 @@ class LLMProcessingPayloadPost(BaseModel):
     sender_name: str = Field(description="The name of the sender")
 
     is_private: bool = Field(description="Whether the message is private")
-    images: list[str] | None = Field(description="The base64 encoded images received from sender")
-    audio: str | None = Field(description="The base64 encoded audio received from sender")
+    images: list[str] | None = Field(description="The base64 encoded images received from sender. Has JPEG mime type")
+    audio: str | None = Field(description="The base64 encoded audio received from sender. Has OGG mime type")
 
 class LLMProcessingPayloadPostResponse(BaseModel):
     message_id: str = Field(description="The id of the message")
@@ -26,4 +26,4 @@ class LLMProcessingPayloadPostResponse(BaseModel):
     sender_name: str = Field(description="The name of the sender")
 
     is_private: bool = Field(description="Whether the message is private")
-    images: list[str] | None = Field(description="The base64 encoded images received from sender")
+    images: list[str] | None = Field(description="The base64 encoded images received from sender. Has JPEG mime type")

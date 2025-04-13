@@ -11,23 +11,27 @@ llm_processing_router = APIRouter(tags=["LLM Processing"])
 
 @llm_processing_router.post("/llm_processing",
     status_code=200,
-    response_model=LLMProcessingPayloadPostResponse,
+    response_model=LLMProcessingPayloadPostResponse | None,
     description="Process message received from messenger and send it to message processing service",
 )
 async def llm_processing(payload: LLMProcessingPayloadPost):
-    transcribed_text = transcribe_audio(payload.audio)
+    if payload.audio:
+        transcribed_text = transcribe_audio(payload.audio)
 
     response = LLMProcessingPayloadPostResponse(
+        message_id=payload.message_id,
         source_name=payload.source_name,
         chat_id=payload.chat_id,
-        text=payload.text + "\n\n" + transcribed_text,
+        text=transcribed_text if payload.audio else payload.text,
         sender_id=payload.sender_id,
         sender_name=payload.sender_name,
+        is_private=payload.is_private,
+        images=payload.images
     )
 
     async with httpx.AsyncClient() as client:
         response = await client.post(
-            f"{MESSAGE_PROCESSING_SERVICE_URL}/api/new_message",
+            f"{MESSAGE_PROCESSING_SERVICE_URL}/new_message",
             json=response.model_dump(),
         )
 

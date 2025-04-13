@@ -43,17 +43,17 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         images = []
         audio = None
         
+        # Process voice messages if exist
+        if message.voice:
+            # Get the voice message as base64
+            audio = await get_blob_voice(message.voice)
+
         # Process photos if exist
         if message.photo:
             # Get the photo as base64
             image_blob = await get_blob_photo(message.photo)
             if image_blob:
                 images.append(image_blob)
-        
-        # Process voice messages if exist
-        if message.voice:
-            # Get the voice message as base64
-            audio = await get_blob_voice(message.voice)
         
         # Process album/media group if available
         if message.media_group_id:
@@ -64,7 +64,6 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     'expires': message.date.timestamp() + 60,  # Expire after 60 seconds
                     'chat_id': message.chat_id,
                     'images': [],
-                    'videos': []
                 }
             
             # If this message has a photo and we haven't seen it before, add it
@@ -73,7 +72,6 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 
             # Use all media from the media group
             images = context.bot_data[message.media_group_id]['images']
-        
         
         chat_id = message.chat_id
         sender = message.from_user

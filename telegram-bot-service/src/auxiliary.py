@@ -33,7 +33,7 @@ async def send_new_message(message: MessagePayload) -> None:
     logger.info(f"Sending new message: {message}")
     async with aiohttp.ClientSession() as session:
         async with session.post(
-            f"{MESSENGER_API_SERVICE_URL}/new_message", 
+            f"{MESSENGER_API_SERVICE_URL}/api/llm_processing", 
             json=message.model_dump()
         ) as response:
             if response.status != 200:

@@ -9,9 +9,11 @@ dependencies = [
     "dotenv>=0.9.9",
     "fastapi>=0.115.12",
     "poethepoet>=0.33.1",
-    "python-telegram-bot>=22.0",
+    "python-telegram-bot[job-queue]>=22.0",
     "uvicorn>=0.34.0",
+    "watchdog>=6.0.0",
 ]
 
 [tool.poe.tasks]
 start = "python -m main"
+start_with_reload = "python -m run_with_reload"
