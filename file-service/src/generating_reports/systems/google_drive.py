@@ -104,13 +104,13 @@ def upload_file(service, file_content, filename, parent_id, mime_type):
     }
     
     if isinstance(file_content, io.BytesIO):
-        media = MediaIoBaseUpload(file_content, mime_type, resumable=True)
+        media = MediaIoBaseUpload(file_content, mimetype=mime_type, resumable=True)
     elif isinstance(file_content, bytes):
-        media = MediaInMemoryUpload(file_content, mime_type, resumable=True)
+        media = MediaInMemoryUpload(file_content, mimetype=mime_type, resumable=True)
     else:
         # Convert string content to bytes if needed
         content_bytes = file_content if isinstance(file_content, bytes) else file_content.encode('utf-8')
-        media = MediaInMemoryUpload(content_bytes, mime_type, resumable=True)
+        media = MediaInMemoryUpload(content_bytes, mimetype=mime_type, resumable=True)
     
     file = service.files().create(
         body=file_metadata,
