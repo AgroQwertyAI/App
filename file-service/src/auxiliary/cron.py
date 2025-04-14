@@ -21,7 +21,7 @@ def create_cron_job(setting_id: int, setting: SettingPost):
         
         # Create the job
         job = cron.new(
-            command=f"{python_path} {save_report_path} {setting_id}"
+            command=f"{python_path} {save_report_path} {setting_id} > /proc/1/fd/1 2>/proc/1/fd/2"
         )
         
         # Set the schedule from the setting
