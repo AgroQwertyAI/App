@@ -17,3 +17,23 @@ class ChatRegistrationSchema(BaseModel):
     chat_id: str = Field(description="The id of the chat")
     chat_name: str = Field(description="The name of the chat")
     source_name: Literal['telegram'] = Field(default='telegram', description="The source of the chat")
+
+class SendMessageText(BaseModel):
+    chat_id: str = Field(description="The id of the chat")
+    text: str = Field(description="The text to send")
+
+class SendMessageImage(BaseModel):
+    chat_id: str = Field(description="The id of the chat")
+    image: str = Field(description="The base64 encoded image to send")
+
+class SendMessageFile(BaseModel):
+    chat_id: str = Field(description="The id of the chat")
+    file: str = Field(description="The base64 encoded file to send")
+    filename: Optional[str] = Field(default=None, description="The name of the file")
+    caption: Optional[str] = Field(default=None, description="The caption of the file")
+    mimetype: Optional[str] = Field(default=None, description="The mime type of the file")
+
+class LogSchema(BaseModel):
+    message: str = Field(description="The message to log")
+    level: Literal['info', 'error', 'warning'] = Field(description="The level of the log")
+    source: str = Field(default='telegram', description="The source of the log")

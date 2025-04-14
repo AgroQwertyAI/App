@@ -6,11 +6,13 @@ parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(parent_dir)
 
 import argparse
+import json
+from src.newsletter import send_report
 from src.session import get_session
-from src.generating_reports.systems.filesystem import save_filesystem_report_and_send_messages
-from src.generating_reports.systems.yandex_disk import save_yandex_disk_report_and_send_messages
-from src.generating_reports.systems.google_drive import save_google_drive_report_and_send_messages
-from src.config import logger
+from src.generating_reports.systems.filesystem import save_filesystem_report
+from src.generating_reports.systems.yandex_disk import save_yandex_disk_report
+from src.generating_reports.systems.google_drive import save_google_drive_report
+from src.auxiliary.logging import log_info
 
 def save_report(setting_id: int):
     """
@@ -20,7 +22,7 @@ def save_report(setting_id: int):
         setting_id: The ID of the setting to generate a report for
     """
     try:
-        logger.info(f"Starting report generation for setting ID: {setting_id}")
+        log_info(f"Starting report generation for setting ID: {setting_id}", 'info')
         
         # Get setting information from database
         with get_session() as conn:
@@ -29,25 +31,28 @@ def save_report(setting_id: int):
             setting = cursor.fetchone()
 
             if not setting:
-                logger.error(f"Setting with ID {setting_id} not found")
+                log_info(f"Setting with ID {setting_id} not found", 'error')
                 return
 
             # Log the setting info for debugging
-            logger.info(f"Found setting: {setting['setting_name']}")
+            log_info(f"Found setting: {setting['setting_name']}", 'info')
 
-            if setting['type'] == 'filesystem':
-                save_filesystem_report_and_send_messages(setting)
+        if setting['type'] == 'filesystem':
+            file = save_filesystem_report(setting)
 
-            if setting['type'] == 'yandex-disk':
-                save_yandex_disk_report_and_send_messages(setting)
+        if setting['type'] == 'yandex-disk':
+            file = save_yandex_disk_report(setting)
 
-            if setting['type'] == 'google-drive':
-                save_google_drive_report_and_send_messages(setting)
+        if setting['type'] == 'google-drive':
+            file = save_google_drive_report(setting)
 
-            logger.info(f"Report for setting ID {setting_id} has been processed")
-            
+        # Send report to specified contacts
+        for message in json.loads(setting['send_to']) if isinstance(setting['send_to'], str) else setting['send_to']:
+            send_report(file, message['messenger'], message['phone_number'])
+        
+        log_info(f"Report for setting ID {setting_id} has been processed", 'info')  
     except Exception as e:
-        logger.error(f"Error generating report for setting ID {setting_id}: {str(e)}")
+        log_info(f"Error generating report for setting ID {setting_id}: {e}", 'error')
         raise
 
 if __name__ == "__main__":

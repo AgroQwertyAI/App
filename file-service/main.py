@@ -8,14 +8,17 @@ from src.routers.management import management_router
 from src.init_db import init_db
 from contextlib import asynccontextmanager
 from fastapi.middleware.cors import CORSMiddleware
+from src.auxiliary.logging import log_info
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Lifespan event handler for startup and shutdown events"""
     # Startup
     init_db()
-
+    log_info("File service started", 'info')
     yield
+    # Shutdown
+    log_info("File service ended", 'info')
 
 app = FastAPI(title="File Service", description="File Service", lifespan=lifespan)
 

@@ -9,6 +9,7 @@ from src.auxiliary import (
     unregister_chat,
     get_blob_photo,
     get_blob_voice,
+    log_info
 )
 
 
@@ -88,12 +89,13 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
         await send_new_message(payload)
+        log_info(f"Message {message.message_id} from {message.chat.id} processed", 'info')
     except Exception as e:
-        logger.error(f"Error in message_handler: {e}")
+        log_info(f"Error in handling message {message.message_id} from {message.chat.id}", 'error')
+        raise e
 
 
 async def chat_member_join_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    logger.info(f"Chat member join handler called for chat {update.my_chat_member.chat.id}")
     try:
         new_status = update.my_chat_member.new_chat_member.status
         if new_status != 'member':
@@ -111,12 +113,14 @@ async def chat_member_join_handler(update: Update, context: ContextTypes.DEFAULT
             chat_id=chat_id,
             text="Привет! Я зафиксировал добавление в чат!"
         )
+
+        log_info(f"Chat {chat_id} joined", 'info')
     except Exception as e:
-        logger.error(f"Error in chat_member_join_handler: {e}")
+        log_info(f"Error in handling chat {chat_id} join", 'error')
+        raise e
 
 
 async def chat_member_left_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    logger.info(f"Chat member left handler called for chat {update.my_chat_member.chat.id}")
     try:
         new_status = update.my_chat_member.new_chat_member.status
         if new_status not in ['left', 'kicked']:
@@ -126,5 +130,7 @@ async def chat_member_left_handler(update: Update, context: ContextTypes.DEFAULT
         chat_id = chat.id
 
         await unregister_chat(str(chat_id))
+        log_info(f"Chat {chat_id} left", 'info')
     except Exception as e:
-        logger.error(f"Error in chat_member_left_handler: {e}")
+        log_info(f"Error in handling chat {chat_id} left", 'error')
+        raise e

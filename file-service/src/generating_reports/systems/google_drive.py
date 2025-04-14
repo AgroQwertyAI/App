@@ -11,16 +11,18 @@ from src.newsletter import send_report
 from pathlib import Path
 import tempfile
 import os
+from src.auxiliary.logging import log_info
 from src.generating_reports.helper import (
     get_pending_messages, 
     aggregate_messages, 
     save_report_to_db,
     get_image_binary_from_base64,
     save_message_report_to_db,
-    delete_pending_messages
+    delete_pending_messages,
+    convert_dataframe_to_bytes_xlsx,
+    group_messages_by_sender,
+    get_aggregated_json_from_messages
 )
-from collections import defaultdict
-from src.config import logger
 
 OAUTH_CONFIG_DIR = Path("/config")
 CONFIG_FILE_GOOGLE_DRIVE = OAUTH_CONFIG_DIR / "google_drive_credentials.json"
@@ -31,9 +33,9 @@ def get_google_drive_config():
         with open(CONFIG_FILE_GOOGLE_DRIVE, "r") as f:
             data = json.load(f)
             return data
-    except Exception as e:
-        logger.error(f"Error getting Google Drive config: {e}")
-        return None
+    except Exception:
+        log_info(f"Error getting Google Drive config", 'error')
+        raise
 
 def get_drive_service():
     """Create and return a Google Drive service instance"""
@@ -131,22 +133,19 @@ def find_shared_folder(service):
     items = results.get('files', [])
     
     if not items:
-        logger.error(f"Shared folder '{folder_name}' not found. Please make sure it's shared with the service account.")
+        log_info(f"Shared folder '{folder_name}' not found. Please make sure it's shared with the service account.", 'error')
         return None
         
     return items[0]['id']
 
-def save_google_drive_report_and_send_messages(setting: dict) -> bool:
+def save_google_drive_report(setting: dict) -> str:
     # Extract setting ID from the setting dictionary
     setting_id = setting["setting_id"]
-    logger.info(f"Saving report and sending messages for setting {setting_id}")
+    log_info(f"Saving report and sending messages for setting {setting_id}", 'info')
 
     with get_session() as conn:
         # 1. Fetch all pending messages associated with the setting
         pending_messages = get_pending_messages(setting_id, conn)
-        
-        if not pending_messages:
-            return False
         
         # 2. Aggregate formatted text into one JSON
         aggregated_data = aggregate_messages(pending_messages)
@@ -160,7 +159,7 @@ def save_google_drive_report_and_send_messages(setting: dict) -> bool:
         # Find the shared agriculture folder
         base_folder_id = find_shared_folder(service)
         if not base_folder_id:
-            logger.error("Cannot proceed without access to the shared folder")
+            log_info("Cannot proceed without access to the shared folder", 'error')
             return False
         
         # Create report directories on Google Drive with the shared folder as base
@@ -188,11 +187,7 @@ def save_google_drive_report_and_send_messages(setting: dict) -> bool:
         # Create base64 encoded file content
         file = ""
         if report_format == "xlsx":
-            # Create Excel file in memory
-            buffer = io.BytesIO()
-            df.to_excel(buffer, index=False)
-            buffer.seek(0)
-            file_content = buffer.read()
+            file_content = convert_dataframe_to_bytes_xlsx(df)
             
             # Upload to Google Drive directly from memory
             memory_file = io.BytesIO(file_content)
@@ -209,15 +204,8 @@ def save_google_drive_report_and_send_messages(setting: dict) -> bool:
         
         # 4. Create a new Report record
         report_id = save_report_to_db(setting_id, file, conn)
-
-        for message in json.loads(setting['send_to']) if isinstance(setting['send_to'], str) else setting['send_to']:
-            send_report(file, message['messenger'], message['phone_number'])
         
-        # Group messages by sender_id
-        messages_by_sender = defaultdict(list)
-        for message in pending_messages:
-            sender_id = message["sender_id"]
-            messages_by_sender[sender_id].append(message)
+        messages_by_sender = group_messages_by_sender(pending_messages)
         
         # Process each sender's messages as a group
         for sender_id, sender_messages in messages_by_sender.items():
@@ -225,46 +213,40 @@ def save_google_drive_report_and_send_messages(setting: dict) -> bool:
             user_dir_name = str(sender_id)
             user_dir_id = create_folder(service, user_dir_name, messages_dir_id)
             
-            # 1. Aggregate original_message_text with [SEP] separators
-            aggregated_text = ""
+            # Create messages folder
+            messages_folder_id = create_folder(service, "messages", user_dir_id)
+            
+            # 4.1 Save each message separately
             for i, message in enumerate(sender_messages):
-                if i > 0:
-                    aggregated_text += "\n[SEP]\n"
-                aggregated_text += message["original_message_text"]
-            
-            # Save aggregated raw text
-            upload_file(
-                service,
-                aggregated_text.encode('utf-8'),
-                "raw_text.txt",
-                user_dir_id,
-                'text/plain'
-            )
-            
-            # 2. Aggregate formatted_message_text JSON objects
-            aggregated_json = {}
-            for message in sender_messages:
-                message_json = json.loads(message["formatted_message_text"])
-                for field, value in message_json.items():
-                    if field not in aggregated_json:
-                        aggregated_json[field] = [value]
-                    else:
-                        aggregated_json[field].append(value)
-            
-            # Save aggregated formatted text
-            upload_file(
-                service,
-                json.dumps(aggregated_json).encode('utf-8'),
-                "formatted_text.json",
-                user_dir_id,
-                'application/json'
-            )
-            
-            # Handle images from all messages
-            i = 0
-            for message in sender_messages:
+                # Create a folder for this message
+                message_folder_id = create_folder(service, str(i), messages_folder_id)
+                
+                # Save individual message text
+                upload_file(
+                    service,
+                    message["original_message_text"].encode('utf-8'),
+                    "text.txt",
+                    message_folder_id,
+                    'text/plain'
+                )
+
+                # 4.2 Save formatted text associated with a message
+                upload_file(
+                    service,
+                    message["formatted_message_text"].encode('utf-8'),
+                    "formatted_text.json",
+                    message_folder_id,
+                    'application/json'
+                )
+
+                # 4.3 save images
                 images = json.loads(message["images"]) if message["images"] else {"images": []}
-                for image in images["images"]:
+                
+                # Create images folder for this message
+                images_folder_id = create_folder(service, "images", message_folder_id)
+                
+                # Save each image for this message
+                for j, image in enumerate(images["images"]):
                     # Save the base64 encoded image with index to keep them separate
                     try:
                         image_binary, image_extension = get_image_binary_from_base64(image)
@@ -274,22 +256,32 @@ def save_google_drive_report_and_send_messages(setting: dict) -> bool:
                         upload_file(
                             service,
                             image_binary,
-                            f"image_{i}.{image_extension}",
-                            user_dir_id,
+                            f"image_{j}.{image_extension}",
+                            images_folder_id,
                             mime_type
                         )
-                        i += 1
                     except Exception as e:
-                        logger.error(f"Error saving image: {e}")
-            
-            # Create MessageReport records for each original message
-            for message in sender_messages:
+                        log_info(f"Error saving image: {e}", 'error')
+
+                # save message to db
                 save_message_report_to_db(message, report_id, conn)
+            
+        # 4.4 Aggregate formatted_message_text JSON objects
+        aggregated_json = get_aggregated_json_from_messages(pending_messages)
+        
+        # Save aggregated formatted text
+        upload_file(
+            service,
+            json.dumps(aggregated_json).encode('utf-8'),
+            "formatted_text.json",
+            report_dir_id,
+            'application/json'
+        )
         
         # 6. Delete previous messages_pending for this setting
         delete_pending_messages(setting_id, conn)
         
-    return True
+    return file
 
 def move_google_drive_report_to_deleted(setting_id: int):
     try:
@@ -299,7 +291,7 @@ def move_google_drive_report_to_deleted(setting_id: int):
         # Find the shared agriculture folder
         base_folder_id = find_shared_folder(service)
         if not base_folder_id:
-            logger.error("Cannot proceed without access to the shared folder")
+            log_info("Cannot proceed without access to the shared folder", 'error')
             return
         
         # Find reports folder in the shared folder
@@ -308,7 +300,7 @@ def move_google_drive_report_to_deleted(setting_id: int):
         reports_items = reports_results.get('files', [])
         
         if not reports_items:
-            logger.error("Reports folder not found in the shared folder")
+            log_info("Reports folder not found in the shared folder", 'error')
             return
             
         reports_id = reports_items[0]['id']
@@ -319,7 +311,7 @@ def move_google_drive_report_to_deleted(setting_id: int):
         active_items = active_results.get('files', [])
         
         if not active_items:
-            logger.error("Active folder not found in the reports folder")
+            log_info("Active folder not found in the reports folder", 'error')
             return
             
         active_folder_id = active_items[0]['id']
@@ -330,7 +322,7 @@ def move_google_drive_report_to_deleted(setting_id: int):
         setting_items = setting_results.get('files', [])
         
         if not setting_items:
-            logger.info(f"Setting folder {setting_id} not found in the active folder")
+            log_info(f"Setting folder {setting_id} not found in the active folder", 'error')
             return
             
         source_folder_id = setting_items[0]['id']
@@ -354,8 +346,8 @@ def move_google_drive_report_to_deleted(setting_id: int):
             fields='id, parents'
         ).execute()
         
-        logger.info(f"Moved report folder for setting ID {setting_id} to deleted")
+        log_info(f"Moved report folder for setting ID {setting_id} to deleted", 'info')
     
     except Exception as e:
-        logger.error(f"Error moving report for setting ID {setting_id}: {str(e)}")
+        log_info(f"Error moving report for setting ID {setting_id}: {e}", 'error')
         raise
