@@ -10,16 +10,9 @@ class TimeRange(BaseModel):
     format: Optional[str] = None
 
 
-class MappingItem(BaseModel):
-    """Определение маппинга для конкретного типа сообщения."""
-    message_type: str
-    mapping: Dict[str, Any]
-
-
 class TableRequest(BaseModel):
     """Запрос на создание таблицы из данных сообщений."""
     time: TimeRange
-    type_mappings: List[MappingItem]
     columns: List[str]
     format: str = "xlsx"
 
@@ -27,10 +20,10 @@ class TableRequest(BaseModel):
 class ChartDefinition(BaseModel):
     """Определение параметров диаграммы."""
     chart_type: str
-    label_role: str  # Логическая роль для метки (ось X или сектор)
+    label_field: str  # Имя поля для метки (ось X или сектор)
     value_aggregation: str  # Тип агрегации: count/sum
-    value_source_role: Optional[str] = None  # Логическая роль для значения (используется при value_aggregation='sum')
-    series_role: Optional[str] = None  # Логическая роль для серии (используется только для stacked_bar)
+    value_field: Optional[str] = None  # Имя поля для значения (используется при value_aggregation='sum')
+    series_field: Optional[str] = None  # Имя поля для серии (используется только для stacked_bar)
     title: str
 
 
@@ -38,7 +31,6 @@ class ChartRequest(BaseModel):
     """Запрос на создание диаграммы из данных сообщений."""
     time: TimeRange
     chart_definition: ChartDefinition
-    type_mappings: List[MappingItem]
 
 
 class ChartDataset(BaseModel):

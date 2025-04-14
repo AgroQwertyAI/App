@@ -3,8 +3,7 @@ from abc import ABC, abstractmethod
 from typing import List, Tuple, Any, Set, Dict, Optional
 from collections import defaultdict
 
-from src.models import ChartResponse, ChartDataset, ChartDefinition, MappingItem
-from src.models import apply_mapping
+from src.models import ChartResponse, ChartDataset, ChartDefinition
 
 logger = logging.getLogger(__name__)
 
@@ -74,10 +73,10 @@ class AdvancedChartGenerator(ChartGenerator):
                  values_data: List[Tuple[Any, float, Any]],
                  chart_definition: ChartDefinition) -> ChartResponse:
 
-        # Check if series_role is specified
-        if not chart_definition.series_role:
-            logger.warning(f"No series_role parameter specified for {chart_definition.chart_type} chart")
-            # Return a simple chart if series_role is missing
+        # Check if series_field is specified
+        if not chart_definition.series_field:
+            logger.warning(f"No series_field parameter specified for {chart_definition.chart_type} chart")
+            # Return a simple chart if series_field is missing
             aggregated_values = self._aggregate_values_for_label(unique_labels, values_data)
             datasets = [ChartDataset(label="Data", data=aggregated_values)]
         else:
@@ -104,7 +103,7 @@ class AdvancedChartGenerator(ChartGenerator):
 class ChartGeneratorFactory:
     """Factory for creating chart generators of the required type."""
 
-    _simple_chart_types = {"pie", "bar", "line"}
+    _simple_chart_types = {"pie", "bar", "line", "doughnut"}
     _advanced_chart_types = {"stacked_bar"}
 
     @classmethod
@@ -120,61 +119,66 @@ class ChartGeneratorFactory:
     def get_supported_types(cls) -> Set[str]:
         return cls._simple_chart_types.union(cls._advanced_chart_types)
 
-
 def extract_field_values(
         messages: List[Dict[str, Any]],
-        mappings_by_type: Dict[str, Dict[str, Any]],
-        label_role: str,
-        value_source_role: Optional[str],
-        series_role: Optional[str],
+        label_field: str,
+        value_field: Optional[str],
+        series_field: Optional[str],
         value_aggregation: str
 ) -> Tuple[List[Any], List[Tuple[Any, float, Any]]]:
-    """Extracts field values from messages according to mapping."""
+    """Extracts field values directly from message data."""
     labels_data = []
     values_data = []
+    
+    logger.info(f"Extracting data: label_field={label_field}, value_field={value_field}, series_field={series_field}")
 
     for msg in messages:
-        if not isinstance(msg.get('data'), dict) or 'message_type' not in msg['data']:
-            continue
+        data_items = msg.get('data', [])
+        if not isinstance(data_items, list):
+            data_items = [data_items] if data_items else []
+        
+        for data_item in data_items:
+            if not isinstance(data_item, dict):
+                continue
+                
+            label_value = data_item.get(label_field)
+            if label_value is not None:
+                labels_data.append(label_value)
+                
+                if value_aggregation == 'count':
+                    values_data.append((label_value, 1, data_item.get(series_field)))
+                elif value_aggregation == 'sum' and value_field:
+                    try:
+                        # Handle empty strings or convert to numeric
+                        value_str = data_item.get(value_field, "0")
+                        if value_str == "":
+                            value_str = "0"
+                        # Remove any non-numeric characters (like commas)
+                        value_str = ''.join(c for c in str(value_str) if c.isdigit() or c == '.' or c == '-')
+                        value = float(value_str)
+                        values_data.append((label_value, value, data_item.get(series_field)))
+                    except (ValueError, TypeError):
+                        logger.warning(f"Non-numeric value '{data_item.get(value_field)}' "
+                                      f"for field {value_field}")
 
-        msg_type = msg['data']['message_type']
-        if msg_type not in mappings_by_type:
-            continue
-
-        mapped_msg = apply_mapping(msg, mappings_by_type[msg_type])
-
-        label_value = mapped_msg.get(label_role)
-        if label_value is not None:
-            labels_data.append(label_value)
-            if value_aggregation == 'count':
-                values_data.append((label_value, 1, mapped_msg.get(series_role)))
-            elif value_aggregation == 'sum' and value_source_role:
-                try:
-                    value = float(mapped_msg.get(value_source_role, 0))
-                    values_data.append((label_value, value, mapped_msg.get(series_role)))
-                except (ValueError, TypeError):
-                    logger.warning(f"Non-numeric value '{mapped_msg.get(value_source_role)}' "
-                                   f"for the role {value_source_role}")
-
+    # Log extracted data for debugging
+    logger.info(f"Extracted {len(labels_data)} labels and {len(values_data)} value points")
     return labels_data, values_data
 
 
-def generate_chart_data_from_mapping(
+def generate_chart_data_from_data(
         messages: List[Dict[str, Any]],
-        chart_definition: ChartDefinition,
-        type_mappings: List[MappingItem]
+        chart_definition: ChartDefinition
 ) -> ChartResponse:
-    """Generates data for the diagram based on the diagram definition and mappings."""
-    mappings_by_type = {item.message_type: item.mapping for item in type_mappings}
+    """Generates chart data directly from messages using field names."""
     title = chart_definition.title
     chart_type = chart_definition.chart_type
 
     labels_data, values_data = extract_field_values(
         messages,
-        mappings_by_type,
-        chart_definition.label_role,
-        chart_definition.value_source_role,
-        chart_definition.series_role,
+        chart_definition.label_field,
+        chart_definition.value_field,
+        chart_definition.series_field,
         chart_definition.value_aggregation
     )
 

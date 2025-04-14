@@ -250,6 +250,85 @@ app.post('/send_image', async (req, res) => {
   }
 });
 
+// Add this endpoint for sending files
+app.post('/send_file', async (req, res) => {
+  try {
+    const { user, file, filename, caption } = req.body;
+    
+    if (!user || !file) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Both user and file parameters are required' 
+      });
+    }
+
+    let media;
+    
+    // Handle different file formats
+    if (typeof file === 'string') {
+      // If file is a URL
+      if (file.startsWith('http://') || file.startsWith('https://')) {
+        try {
+          const response = await axios.get(file, { responseType: 'arraybuffer' });
+          const mimeType = response.headers['content-type'];
+          const fileBuffer = Buffer.from(response.data, 'binary').toString('base64');
+          media = new MessageMedia(mimeType, fileBuffer, filename || 'file');
+        } catch (error) {
+          return res.status(400).json({
+            success: false,
+            error: `Failed to download file from URL: ${error.message}`
+          });
+        }
+      } 
+      // If file is a base64 string (possibly with data URI)
+      else if (file.startsWith('data:')) {
+        try {
+          const matches = file.match(/^data:([A-Za-z-+.\/]+);base64,(.+)$/);
+          if (matches && matches.length === 3) {
+            const mimeType = matches[1];
+            const base64Data = matches[2];
+            media = new MessageMedia(mimeType, base64Data, filename || 'file');
+          } else {
+            throw new Error('Invalid data URI format');
+          }
+        } catch (error) {
+          return res.status(400).json({
+            success: false,
+            error: `Invalid file data: ${error.message}`
+          });
+        }
+      }
+      // Plain base64 string
+      else {
+        const mimeType = req.body.mimetype || 'application/octet-stream';
+        media = new MessageMedia(mimeType, file, filename || 'file');
+      }
+    } else {
+      return res.status(400).json({
+        success: false,
+        error: 'File must be a URL or base64 encoded string'
+      });
+    }
+    
+    // Send the file with optional caption
+    const options = {};
+    if (caption) {
+      options.caption = caption;
+    }
+    
+    await client.sendMessage(user, media, options);
+    
+    console.log(`File sent to ${user}${filename ? ` (${filename})` : ''}`);
+    return res.status(200).json({ success: true });
+  } catch (error) {
+    console.error('Error sending file:', error.message);
+    return res.status(500).json({ 
+      success: false, 
+      error: error.message 
+    });
+  }
+});
+
 // Start Express server
 app.listen(PORT, () => {
   console.log(`WhatsApp service listening on port ${PORT}`);

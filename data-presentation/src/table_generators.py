@@ -6,9 +6,6 @@ from enum import Enum
 import pandas as pd
 from fastapi.responses import StreamingResponse, JSONResponse, Response
 
-from src.models import MappingItem
-from src.models import apply_mapping
-
 
 # Base types
 class TableFormat(str, Enum):
@@ -21,38 +18,33 @@ class TableFormat(str, Enum):
 logger = logging.getLogger(__name__)
 
 
-def create_dataframe_from_mapping(
-        messages: List[Dict[str, Any]],
-        type_mappings: List[MappingItem],
-        columns: List[str]
-) -> pd.DataFrame:
-    """Creates a DataFrame based on messages using type mappings."""
+
+def create_dataframe_from_data(messages: List[Dict[str, Any]], columns: List[str]) -> pd.DataFrame:
+    """Creates a DataFrame directly from message data fields."""
     if not messages:
         return pd.DataFrame(columns=columns)
 
-    # Create a dictionary of mappings by message types for quick access
-    mappings_by_type = {item.message_type: item.mapping for item in type_mappings}
-
-    # Transform messages according to mappings
+    # Extract all data items from messages
     records = []
     for msg in messages:
-        msg_type = msg.get('data').get('message_type')
+        data_items = msg.get('data', [])
+        if isinstance(data_items, list):
+            records.extend(data_items)
+        elif isinstance(data_items, dict):
+            records.append(data_items)
 
-        # Skip messages without a defined mapping
-        if not msg_type or msg_type not in mappings_by_type:
-            continue
-
-        # Apply the corresponding mapping
-        mapped_data = apply_mapping(msg, mappings_by_type[msg_type])
-        records.append(mapped_data)
-
-    # Create DataFrame with specified columns
+    # Create DataFrame
     df = pd.DataFrame(records)
 
     # Ensure presence of all requested columns
     for col in columns:
         if col not in df.columns:
             df[col] = None
+
+    # Select only the requested columns if specified
+    if columns:
+        existing_columns = [col for col in columns if col in df.columns]
+        df = df[existing_columns]
 
     return df
 

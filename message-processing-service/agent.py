@@ -1,13 +1,13 @@
 import logging
 import os
 from pydantic import BaseModel, Field
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 from dotenv import load_dotenv
 import aiohttp
 import traceback # For logging
 from settings import get_template_by_id, get_template_id
 
-from scenario import extract_data_from_message, is_report, agentic, get_history_for_followup
+from scenario import extract_data_from_message, is_report, agentic, get_history_for_followup,determine_questions
 from util import dict_to_csv_string, generate_table_image, extract_questions, parse_table_from_message
 
 
@@ -23,6 +23,7 @@ API_PORT = int(os.getenv("API_PORT", 8001))
 FILE_SERVICE_URL = os.environ["FILE_SERVICE_URL"]
 LLM_SERVICE_URL = os.environ["LLM_SERVICE_URL"]
 WHATSAPP_SERVICE_URL = os.getenv("WHATSAPP_SERVICE_URL", "http://localhost:52101")
+SAVE_SERVICE_URL = os.getenv("SAVE_SERVICE_URL", "http://localhost:52001")  # Add save service URL
 
 class DataServicePayload(BaseModel):
     message_id: str
@@ -45,12 +46,26 @@ class NewMessageRequest(BaseModel):
     image: Optional[str] = None
     is_private: Optional[bool] = False
 
+
+class Images(BaseModel):
+    images: List[str] = []
+
+class SaveServicePayload(BaseModel):
+    sender_phone_number: str
+    sender_name: str
+    sender_id: str
+    original_message_text: str
+    formatted_message_text: Dict[str, List[Any]]
+    images: Images = Field(default_factory=lambda: Images(images=[]))
+    extra: Dict[str, Any] = Field(default_factory=dict)
+
 class Agent:
     
     def __init__(self, user):
         self.state = "NONE"
         self.user = user
         self.history = []
+        self.original_report_message = "None"
         
     
     async def process_chat_message(self, message):
@@ -98,15 +113,15 @@ class Agent:
                     
                     # 2. Prepare payload for the update call (including LLM data)
                     update_payload = DataServicePayload(
-                        message_id=message.message_id,
-                        source_name=message.source_name,
-                        chat_id=message.chat_id,
-                        text=message.text,
-                        sender_id=message.sender_id,
-                        sender_name=message.sender_name,
-                        image=message.image,
+                        message_id=self.original_report_message.message_id,
+                        source_name=self.original_report_message.source_name,
+                        chat_id=self.original_report_message.chat_id,
+                        text=self.original_report_message.text,
+                        sender_id=self.original_report_message.sender_id,
+                        sender_name=self.original_report_message.sender_name,
+                        image=self.original_report_message.image,
                         data=table,
-                        is_private=message.is_private
+                        is_private=self.original_report_message.is_private
                     )
 
                     # 3. Send the update to the data service
@@ -240,18 +255,18 @@ class Agent:
             
             success  = True
             
-            questions = False
+            print(result)
             
             for row in result:
-                if row['success'] and not row['question']:
+                if row['success']:
                     parsed_rows.append(row['data'][0])
+                    
+                    data_row = row['data'][0]
+                    if not data_row['Подразделение'] or not data_row['Операция'] or not data_row['Культура'] or not data_row['За день, га']or not data_row['С начала операции, га']:
+                        success = False
                 else:
                     success = False
                 
-                if row['question']:
-                    questions = True
-                    
-            print(result)
             
             if success:
 
@@ -269,15 +284,22 @@ class Agent:
                 )
 
                 # 3. Send the update to the data service
-                success = await self.send_to_data_service_new_message(update_payload)
+                data_service_success = await self.send_to_data_service_new_message(update_payload)
+                
+                # 4. Send the processed data to the save service
+                save_service_success = await self.send_to_save_service(message, parsed_rows)
 
-                if success:
+                if data_service_success:
                     logger.info(f"[Background Task] Successfully sent LLM update to Data Service for message {message.message_id}")
                 else:
                     logger.error(f"[Background Task] Failed to send LLM update to Data Service for message {message.message_id}")
-            elif questions:
-                print(questions)
-                
+                    
+                if save_service_success:
+                    logger.info(f"[Background Task] Successfully sent data to Save Service for message {message.message_id}")
+                else:
+                    logger.error(f"[Background Task] Failed to send data to Save Service for message {message.message_id}")
+            else:
+
                 await self.ask_for_follow_up(message, result)
                 
 
@@ -290,18 +312,82 @@ class Agent:
             logger.error(f"Error processing with LLM: {traceback.format_exc()}")
             return {}
 
+    async def send_to_save_service(self, message: NewMessageRequest, data: List[Dict[str, Any]], setting_id: int = 1):
+        """Sends processed data to the Save Service."""
+        url = f"{SAVE_SERVICE_URL}/api/setting/{setting_id}/message_pending"
+        
+        try:
+            # Get template information
+            template_id = await get_template_id(message.chat_id)
+            template = get_template_by_id(template_id)
+            cols = template["columns"]
+            
+            # Initialize formatted_message_text with all expected columns
+            formatted_message_text = {col: [] for col in cols}
+            
+            # Count the number of rows for consistency validation
+            row_count = len(data)
+            
+            # Process each row in the data
+            for row in data:
+                # For each column in the template, add the value from this row or ''
+                for col in cols:
+                    formatted_message_text[col].append(row.get(col, ''))
+            
+            # Validation: ensure all arrays have the same length
+            for col, values in formatted_message_text.items():
+                if len(values) != row_count:
+                    logger.warning(f"Column '{col}' has {len(values)} values but expected {row_count}. Padding with empty strings.")
+                    # Pad with empty strings if needed
+                    while len(values) < row_count:
+                        values.append('')
+            
+            # Prepare the payload for save service
+            payload = {
+                "sender_phone_number": self.user,
+                "sender_name": message.sender_name,
+                "sender_id": message.sender_id or "",
+                "original_message_text": message.text,
+                "formatted_message_text": formatted_message_text,
+                "images": {"images": [] if not message.image else [message.image]},
+                "extra": {}
+            }
+            
+            logger.info(f"Sending processed message to Save Service: {url}")
+            
+            async with aiohttp.ClientSession() as session:
+                async with session.post(url, json=payload) as response:
+                    if response.status == 200 or response.status == 201:
+                        response_json = await response.json()
+                        logger.info(f"Successfully sent data to Save Service for message {message.message_id}. Response: {response_json}")
+                        return True
+                    else:
+                        error_text = await response.text()
+                        logger.error(f"Failed to send data to Save Service for message {message.message_id}: {response.status} - {error_text}")
+                        return False
+                        
+        except aiohttp.ClientError as e:
+            logger.error(f"HTTP Client Error sending data to Save Service for message {message.message_id}: {str(e)}")
+            return False
+        except Exception as e:
+            logger.error(f"Error sending data to Save Service for message {message.message_id}: {traceback.format_exc()}")
+            return False
+
     async def ask_for_follow_up(self, message: NewMessageRequest, result: dict) -> Dict[str, Any]:
         self.state = "FOLLOW_UP"
+        
+        self.original_report_message = message
         
         table_image_url = generate_table_image(result)
     
         # Generate table image
         table_image_url = generate_table_image(result)
-
-        # Extract questions if any
-        questions = extract_questions(result)
-        print(questions)
+        
         table_csv = dict_to_csv_string(result)
+        # Extract questions if any
+        questions = await determine_questions(table_csv)
+        print(questions)
+        
         # Send initial message
         await self.direct_message("Добрый день! Я обработал ваш недавний отчёт, но возникли некоторые трудности.")
         

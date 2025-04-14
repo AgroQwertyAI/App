@@ -11,11 +11,11 @@ from dotenv import load_dotenv
 from fastapi.middleware.cors import CORSMiddleware
 from src.models import TableRequest, ChartRequest, ChartResponse
 from src.table_generators import (
-    create_dataframe_from_mapping,
+    create_dataframe_from_data,
     generate_table_response,
     TableFormat
 )
-from src.chart_generators import generate_chart_data_from_mapping
+from src.chart_generators import generate_chart_data_from_data
 
 # Set locale for date formatting
 locale.setlocale(locale.LC_ALL, 'ru_RU.UTF-8')
@@ -64,17 +64,18 @@ async def fetch_data_service(url: str) -> dict:
 
 
 def normalize_messages(messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    """Converts messages with data as a list into individual messages."""
+    """Ensures consistent message format, preserving data arrays."""
     normalized = []
 
     for msg in messages:
         if isinstance(msg.get('data'), list):
-            for data_item in msg['data']:
-                new_msg = {k: v for k, v in msg.items() if k != 'data'}
-                new_msg['data'] = data_item
-                normalized.append(new_msg)
-        else:
+            # If data is already a list, keep it as is
             normalized.append(msg)
+        elif isinstance(msg.get('data'), dict):
+            # If data is a dict, wrap it in a list
+            new_msg = {k: v for k, v in msg.items() if k != 'data'}
+            new_msg['data'] = [msg['data']]
+            normalized.append(new_msg)
 
     return normalized
 
@@ -102,7 +103,11 @@ def filter_messages_by_time(messages: List[Dict[str, Any]],
             continue
 
         try:
-            msg_time = datetime.fromisoformat(timestamp)
+            # Handle MongoDB timestamp format
+            if isinstance(timestamp, dict) and '$date' in timestamp:
+                timestamp = timestamp['$date']
+                
+            msg_time = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
             if start_time <= msg_time <= end_time:
                 if time_format:
                     msg['timestamp'] = msg_time.strftime(time_format)
@@ -120,10 +125,10 @@ async def generate_table(
         chat_id: str,
         request: TableRequest
 ):
-    """Generates a table based on a request with field mappings."""
+    """Generates a table directly from message data."""
     # Get data
     messages = await fetch_processed_messages(chat_id)
-
+    
     # Filter by time
     filtered = filter_messages_by_time(
         messages,
@@ -136,8 +141,8 @@ async def generate_table(
         df = pd.DataFrame(columns=request.columns)
         return generate_table_response(df, TableFormat(request.format), f"{chat_id}_empty")
 
-    # Apply mappings and create table
-    df = create_dataframe_from_mapping(filtered, request.type_mappings, request.columns)
+    # Create dataframe directly from data
+    df = create_dataframe_from_data(filtered, request.columns)
 
     # Format and send response
     return generate_table_response(df, TableFormat(request.format), f"{chat_id}_data")
@@ -148,7 +153,7 @@ async def generate_chart(
         chat_id: str,
         request: ChartRequest
 ) -> ChartResponse:
-    """Generates chart data based on a request with field mappings."""
+    """Generates chart data directly from message data."""
     # Get data
     messages = await fetch_processed_messages(chat_id)
 
@@ -160,10 +165,17 @@ async def generate_chart(
         request.time.format
     )
 
-    # Generate chart data
-    return generate_chart_data_from_mapping(
+    # Generate chart data directly from data
+    return generate_chart_data_from_data(
         filtered,
-        request.chart_definition,
-        request.type_mappings
+        request.chart_definition
     )
 
+# --- Main Execution ---
+def main():
+    import uvicorn
+    logger.info(f"Starting Message Processing Service on port {API_PORT}")
+    uvicorn.run(app, host="0.0.0.0", port=API_PORT)
+
+if __name__ == "__main__":
+    main()
