@@ -10,7 +10,6 @@ cloud_config_router = APIRouter(tags=["cloud_config"])
 
 # Create config directory if it doesn't exist
 os.makedirs(OAUTH_CONFIG_DIR, exist_ok=True)
-# Define the path for storing the token
 
 @cloud_config_router.get(
     "/yandex-disk-credentials", 
@@ -45,6 +44,9 @@ async def get_yandex_config():
 )
 async def set_yandex_disk_config(config: YandexDiskConfig = Body(...)):
     """Set a new Yandex OAuth token and shared folder link."""
+    # Create the config directory and any parent directories if they don't exist
+    os.makedirs(os.path.dirname(CONFIG_FILE_YANDEX_DISK), exist_ok=True)
+    
     with open(CONFIG_FILE_YANDEX_DISK, "w") as f:
         json.dump({
             "token": config.token,
@@ -80,6 +82,9 @@ async def set_google_drive_info(
         "service_account_json": google_drive_config.service_account_json,
         "shared_folder_name": google_drive_config.shared_folder_name
     }
+    
+    # Create the config directory and any parent directories if they don't exist
+    os.makedirs(os.path.dirname(CONFIG_FILE_GOOGLE_DRIVE), exist_ok=True)
     
     with open(CONFIG_FILE_GOOGLE_DRIVE, "w") as f:
         json.dump(credentials, f, indent=2)

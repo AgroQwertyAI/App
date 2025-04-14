@@ -1,9 +1,9 @@
 import base64
 import tempfile
-import subprocess
 import os
 from pydub import AudioSegment
 from src.config import logger
+import httpx
 
 def transcribe_audio(audio_base64: str) -> str:
     """
@@ -29,19 +29,30 @@ def transcribe_audio(audio_base64: str) -> str:
     sound.export(temp_wav_path, format="wav")
     
     try:
-        # Call whisper-cli to transcribe the audio (now using WAV file)
-        whisper_cli_path = '/whisper.cpp/build/bin/whisper-cli'
-        result = subprocess.run(
-            [whisper_cli_path, '-l', 'ru', '-m', '/whisper.cpp/models/ggml-tiny.bin', '-f', temp_wav_path],
-            capture_output=True,
-            text=True,
-            check=True
-        )
-        
-        # Extract transcription from output
-        transcription = result.stdout.strip()
+        with open(temp_wav_path, 'rb') as f:
+            files = {'file': ('audio.wav', f)}
+            data = {
+                'temperature': '0.0',
+                'temperature_inc': '0.2',
+                'language': 'ru',
+                'response_format': 'json'
+            }
 
-        return transcription
+            response = httpx.post(
+                'http://127.0.0.1:8080/inference',
+                files=files,
+                data=data,
+                timeout=30
+            )
+
+            if response.status_code != 200:
+                logger.error(f"Whisper server error: {response.status_code}, {response.text}")
+                return ""
+
+            result = response.json()
+            transcription = result.get('text', '').strip()
+
+            return transcription
     finally:
         # Clean up the temporary file
         if os.path.exists(temp_wav_path):

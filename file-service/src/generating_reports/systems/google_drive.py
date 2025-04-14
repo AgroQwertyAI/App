@@ -27,9 +27,13 @@ CONFIG_FILE_GOOGLE_DRIVE = OAUTH_CONFIG_DIR / "google_drive_credentials.json"
 
 def get_google_drive_config():
     """Get the Google Drive credentials from the configuration file."""
-    with open(CONFIG_FILE_GOOGLE_DRIVE, "r") as f:
-        data = json.load(f)
-        return data
+    try:
+        with open(CONFIG_FILE_GOOGLE_DRIVE, "r") as f:
+            data = json.load(f)
+            return data
+    except Exception as e:
+        logger.error(f"Error getting Google Drive config: {e}")
+        return None
 
 def get_drive_service():
     """Create and return a Google Drive service instance"""
@@ -355,4 +359,3 @@ def move_google_drive_report_to_deleted(setting_id: int):
     except Exception as e:
         logger.error(f"Error moving report for setting ID {setting_id}: {str(e)}")
         raise
-
