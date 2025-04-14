@@ -1,25 +1,25 @@
 services:
-  messenger-api-service:
-    build:
-      context: ./messenger-api-service
-      dockerfile: Dockerfile
-    ports:
-      - "7999:7999"
-    volumes:
-      - ./messenger-api-service:/app
-    environment:
-      - PYTHONUNBUFFERED=1
-    env_file:
-      - ./.env
-    networks:
-      - app-network
+  # messenger-api-service:
+  #   build:
+  #     context: ./messenger-api-service
+  #     dockerfile: Dockerfile
+  #   ports:
+  #     - "7999:7999"
+  #   volumes:
+  #     - ./messenger-api-service:/app
+  #   environment:
+  #     - PYTHONUNBUFFERED=1
+  #   env_file:
+  #     - ./.env
+  #   networks:
+  #     - app-network
 
   file-service:
     build:
       context: ./file-service
       dockerfile: Dockerfile
     ports:
-      - "8000:8000"
+      - "52001:52001"
     volumes:
       - ./file-service:/app
       - file_service_local_files:/reports
@@ -30,36 +30,38 @@ services:
       - PYTHONUNBUFFERED=1
     env_file:
       - ./.env
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     networks:
       - app-network
 
-  message-processing-service:
-    build:
-      context: ./message-processing-service
-      dockerfile: Dockerfile
-    ports:
-      - "8001:8001"
-    volumes:
-      - ./message-processing-service:/app
-    env_file:
-      - ./.env
-    environment:
-      - PYTHONUNBUFFERED=1
-    networks:
-      - app-network
+  # message-processing-service:
+  #   build:
+  #     context: ./message-processing-service
+  #     dockerfile: Dockerfile
+  #   ports:
+  #     - "8001:8001"
+  #   volumes:
+  #     - ./message-processing-service:/app
+  #   env_file:
+  #     - ./.env
+  #   environment:
+  #     - PYTHONUNBUFFERED=1
+  #   networks:
+  #     - app-network
 
-  telegram-bot-service:
-    build:
-      context: ./telegram-bot-service
-      dockerfile: Dockerfile
-    env_file:
-      - ./.env
-    volumes:
-      - ./telegram-bot-service:/app
-    environment:
-      - PYTHONUNBUFFERED=1
-    networks:
-      - app-network
+  # telegram-bot-service:
+  #   build:
+  #     context: ./telegram-bot-service
+  #     dockerfile: Dockerfile
+  #   env_file:
+  #     - ./.env
+  #   volumes:
+  #     - ./telegram-bot-service:/app
+  #   environment:
+  #     - PYTHONUNBUFFERED=1
+  #   networks:
+  #     - app-network
 
 networks:
   app-network:

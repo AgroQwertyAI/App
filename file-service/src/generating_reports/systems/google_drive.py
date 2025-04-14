@@ -22,7 +22,7 @@ from src.generating_reports.helper import (
 from collections import defaultdict
 from src.config import logger
 
-OAUTH_CONFIG_DIR = Path("app", "config")
+OAUTH_CONFIG_DIR = Path("/config")
 CONFIG_FILE_GOOGLE_DRIVE = OAUTH_CONFIG_DIR / "google_drive_credentials.json"
 
 def get_google_drive_config():
