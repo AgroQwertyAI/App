@@ -27,7 +27,7 @@ COPY start.sh /start.sh
 RUN chmod +x /start.sh
 
 # Expose port for the FastAPI application
-EXPOSE 8000
+EXPOSE 52001
 
 # Run both cron and the application
 CMD ["/start.sh"]

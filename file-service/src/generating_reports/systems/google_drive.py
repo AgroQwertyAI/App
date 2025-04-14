@@ -22,14 +22,18 @@ from src.generating_reports.helper import (
 from collections import defaultdict
 from src.config import logger
 
-OAUTH_CONFIG_DIR = Path("app", "config")
+OAUTH_CONFIG_DIR = Path("/config")
 CONFIG_FILE_GOOGLE_DRIVE = OAUTH_CONFIG_DIR / "google_drive_credentials.json"
 
 def get_google_drive_config():
     """Get the Google Drive credentials from the configuration file."""
-    with open(CONFIG_FILE_GOOGLE_DRIVE, "r") as f:
-        data = json.load(f)
-        return data
+    try:
+        with open(CONFIG_FILE_GOOGLE_DRIVE, "r") as f:
+            data = json.load(f)
+            return data
+    except Exception as e:
+        logger.error(f"Error getting Google Drive config: {e}")
+        return None
 
 def get_drive_service():
     """Create and return a Google Drive service instance"""
@@ -100,13 +104,13 @@ def upload_file(service, file_content, filename, parent_id, mime_type):
     }
     
     if isinstance(file_content, io.BytesIO):
-        media = MediaIoBaseUpload(file_content, mime_type, resumable=True)
+        media = MediaIoBaseUpload(file_content, mimetype=mime_type, resumable=True)
     elif isinstance(file_content, bytes):
-        media = MediaInMemoryUpload(file_content, mime_type, resumable=True)
+        media = MediaInMemoryUpload(file_content, mimetype=mime_type, resumable=True)
     else:
         # Convert string content to bytes if needed
         content_bytes = file_content if isinstance(file_content, bytes) else file_content.encode('utf-8')
-        media = MediaInMemoryUpload(content_bytes, mime_type, resumable=True)
+        media = MediaInMemoryUpload(content_bytes, mimetype=mime_type, resumable=True)
     
     file = service.files().create(
         body=file_metadata,
@@ -355,4 +359,3 @@ def move_google_drive_report_to_deleted(setting_id: int):
     except Exception as e:
         logger.error(f"Error moving report for setting ID {setting_id}: {str(e)}")
         raise
-
