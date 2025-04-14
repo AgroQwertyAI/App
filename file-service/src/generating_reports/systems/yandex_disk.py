@@ -24,9 +24,13 @@ CONFIG_FILE_YANDEX_DISK = OAUTH_CONFIG_DIR / "yandex_oauth.json"
 
 def get_yandex_disk_config():
     """Get the full Yandex Disk configuration data."""
-    with open(CONFIG_FILE_YANDEX_DISK, "r") as f:
-        data = json.load(f)
-    return data
+    try:
+        with open(CONFIG_FILE_YANDEX_DISK, "r") as f:
+            data = json.load(f)
+        return data
+    except Exception as e:
+        logger.error(f"Error getting Yandex Disk config: {e}")
+        return None
 
 
 def save_yandex_disk_report_and_send_messages(setting: dict) -> bool:
