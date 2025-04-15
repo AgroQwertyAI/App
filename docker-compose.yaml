@@ -1,4 +1,39 @@
 services:
+  messenger-api-service:
+    build:
+      context: ./messenger-api-service
+      dockerfile: Dockerfile
+    ports:
+      - "7999:7999"
+    volumes:
+      - ./messenger-api-service:/app
+    environment:
+      - PYTHONUNBUFFERED=1
+    env_file:
+      - ./.env
+    networks:
+      - app-network
+
+  file-service:
+    build:
+      context: ./file-service
+      dockerfile: Dockerfile
+    ports:
+      - "52001:52001"
+    volumes:
+      - ./file-service:/app
+      - file_service_local_files:/reports
+      - file_service_cron_config:/var/spool/cron
+      - file_service_database:/data
+      - file_service_config:/config
+    environment:
+      - PYTHONUNBUFFERED=1
+    env_file:
+      - ./.env
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - app-network
 
   telegram-bot-service:
     build:
@@ -10,6 +45,21 @@ services:
       - "7998:7998"
     volumes:
       - ./telegram-bot-service:/app
+    environment:
+      - PYTHONUNBUFFERED=1
+    networks:
+      - app-network
+
+  message-processing-service:
+    build:
+      context: ./message-processing-service
+      dockerfile: Dockerfile
+    ports:
+      - "8001:8001"
+    volumes:
+      - ./message-processing-service:/app
+    env_file:
+      - ./.env
     environment:
       - PYTHONUNBUFFERED=1
     networks:
