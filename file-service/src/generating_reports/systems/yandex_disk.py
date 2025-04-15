@@ -6,7 +6,6 @@ import base64
 import io
 from src.auxiliary.logging import log_info
 from src.session import get_session
-from src.newsletter import send_report
 from pathlib import Path
 from src.generating_reports.helper import (
     get_pending_messages, 

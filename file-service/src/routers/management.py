@@ -24,6 +24,6 @@ async def generate_setting(
             raise HTTPException(status_code=404, detail=f"Setting with ID {setting_id} not found")
     
     # Call the save_report function with the setting ID
-    save_report(setting_id)
+    await save_report(setting_id)
     
     return None

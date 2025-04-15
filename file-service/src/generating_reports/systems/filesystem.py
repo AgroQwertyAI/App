@@ -64,24 +64,24 @@ def save_filesystem_report(setting: dict) -> str:
 
             for i, message in enumerate(sender_messages):
                 # 4.1 Save raw texts associated with a message
-                os.makedirs(f"{user_dir}/messages/{i}", exist_ok=True)
-                with open(f"{user_dir}/messages/{i}/text.txt", "w") as f:
+                os.makedirs(f"{user_dir}/{i}", exist_ok=True)
+                with open(f"{user_dir}/{i}/text.txt", "w") as f:
                     f.write(message["original_message_text"])
 
                 # 4.2 Save formatted text associated with a message
-                with open(f"{user_dir}/messages/{i}/formatted_text.json", "w") as f:
+                with open(f"{user_dir}/{i}/formatted_text.json", "w") as f:
                     f.write(message["formatted_message_text"])
 
                 # 4.3 save images
                 images = json.loads(message["images"]) if message["images"] else {"images": []}
-                os.makedirs(f"{user_dir}/messages/{i}/images", exist_ok=True)
+                os.makedirs(f"{user_dir}/{i}/images", exist_ok=True)
                 for j, image in enumerate(images["images"]):
                     # Save the base64 encoded image with index to keep them separate
                     try:
                         image_binary, image_extension = get_image_binary_from_base64(image)
                         
                         # Write binary data to file with index suffix
-                        with open(f"{user_dir}/messages/{i}/images/image_{j}.{image_extension}", "wb") as f:
+                        with open(f"{user_dir}/{i}/images/image_{j}.{image_extension}", "wb") as f:
                             f.write(image_binary)
                     except Exception:
                         log_info(f"Error saving image", 'error')

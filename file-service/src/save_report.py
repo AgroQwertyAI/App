@@ -1,6 +1,6 @@
 import os
 import sys
-
+import asyncio
 # Add the parent directory of src to Python path
 parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(parent_dir)
@@ -14,7 +14,7 @@ from src.generating_reports.systems.yandex_disk import save_yandex_disk_report
 from src.generating_reports.systems.google_drive import save_google_drive_report
 from src.auxiliary.logging import log_info
 
-def save_report(setting_id: int):
+async def save_report(setting_id: int):
     """
     Generate and save a report for the given setting ID
     
@@ -38,13 +38,13 @@ def save_report(setting_id: int):
             log_info(f"Found setting: {setting['setting_name']}", 'info')
 
         if setting['type'] == 'filesystem':
-            file = save_filesystem_report(setting)
+            file = await save_filesystem_report(setting)
 
         if setting['type'] == 'yandex-disk':
-            file = save_yandex_disk_report(setting)
+            file = await save_yandex_disk_report(setting)
 
         if setting['type'] == 'google-drive':
-            file = save_google_drive_report(setting)
+            file = await save_google_drive_report(setting)
 
         # Send report to specified contacts
         for message in json.loads(setting['send_to']) if isinstance(setting['send_to'], str) else setting['send_to']:
@@ -60,4 +60,4 @@ if __name__ == "__main__":
     parser.add_argument("setting_id", type=int, help="The ID of the setting to generate a report for")
     
     args = parser.parse_args()
-    save_report(args.setting_id)
+    asyncio.run(save_report(args.setting_id))
