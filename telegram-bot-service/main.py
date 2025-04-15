@@ -6,14 +6,19 @@ from src.handlers import (
     chat_member_join_handler,
     chat_member_left_handler,
     cleanup_expired_media_groups,
+    contact_handler,
+    phone_command_handler,
+    start_command_handler,
 )
-from telegram.ext import Application, MessageHandler, filters, ChatMemberHandler
+from src.schemas import MappingSchema
+from telegram.ext import Application, MessageHandler, filters, ChatMemberHandler, CommandHandler
 import asyncio
 from fastapi import FastAPI
 from src.message_router import message_router
 import uvicorn
 from fastapi.middleware.cors import CORSMiddleware
 from src.auxiliary import log_info
+from src.database import initialize_db, get_mapping as get_db_mapping
 
 api = FastAPI(
     title="Telegram Bot Service", 
@@ -30,13 +35,27 @@ api.add_middleware(
     allow_headers=["*"],
 )
 
+@api.get("/mapping", response_model=list[MappingSchema], tags=["mapping"])
+async def get_mapping():
+    mappings = get_db_mapping()
+    return mappings
+
 async def run_telegram_bot():
     token = TELEGRAM_API_KEY
+    
+    # Initialize database
+    initialize_db()
     
     telegram_app = Application.builder().token(token).build()
     # Store the bot instance in the bot_instance module
     set_bot(telegram_app.bot)
     
+    # Register handler for contacts to save phone numbers
+    telegram_app.add_handler(MessageHandler(filters.CONTACT, contact_handler))
+    # Register command handler for requesting phone number
+    telegram_app.add_handler(CommandHandler("phone", phone_command_handler))
+    # Register command handler for displaying menu
+    telegram_app.add_handler(CommandHandler("start", start_command_handler))
     # Register the handler for text, photos, videos, and voice messages
     telegram_app.add_handler(MessageHandler(filters.TEXT | filters.PHOTO | filters.VOICE, message_handler))
     # Register handler for bot added to group

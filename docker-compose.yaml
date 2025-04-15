@@ -1,26 +1,19 @@
 services:
 
-  file-service:
+  telegram-bot-service:
     build:
-      context: ./file-service
+      context: ./telegram-bot-service
       dockerfile: Dockerfile
-    ports:
-      - "52001:52001"
-    volumes:
-      - ./file-service:/app
-      - file_service_local_files:/reports
-      - file_service_cron_config:/var/spool/cron
-      - file_service_database:/data
-      - file_service_config:/config
-    environment:
-      - PYTHONUNBUFFERED=1
     env_file:
       - ./.env
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
+    ports:
+      - "7998:7998"
+    volumes:
+      - ./telegram-bot-service:/app
+    environment:
+      - PYTHONUNBUFFERED=1
     networks:
       - app-network
-
 
 networks:
   app-network:

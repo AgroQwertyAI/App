@@ -1,5 +1,5 @@
 from src.config import logger
-from telegram import Update
+from telegram import Update, ReplyKeyboardMarkup, KeyboardButton
 from telegram.ext import ContextTypes
 from src.schemas import MessagePayload, ChatRegistrationSchema
 import time
@@ -11,6 +11,7 @@ from src.auxiliary import (
     get_blob_voice,
     log_info
 )
+from src.database import save_phone_number, get_phone_number
 
 
 async def cleanup_expired_media_groups(context: ContextTypes.DEFAULT_TYPE):
@@ -76,6 +77,10 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         sender_id = sender.id if sender else None
         sender_name = sender.username if sender and sender.username else\
             (sender.first_name if sender and sender.first_name else "")
+        
+        phone_number = get_phone_number(str(chat_id))
+        if phone_number:
+            chat_id = phone_number
 
         payload = MessagePayload(
             message_id=str(message.message_id),
@@ -133,4 +138,88 @@ async def chat_member_left_handler(update: Update, context: ContextTypes.DEFAULT
         log_info(f"Chat {chat_id} left", 'info')
     except Exception as e:
         log_info(f"Error in handling chat {chat_id} left", 'error')
+        raise e
+
+
+async def contact_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle contact sharing to save phone numbers"""
+    try:
+        message = update.message
+        if not message or not message.contact:
+            return
+            
+        contact = message.contact
+        chat_id = str(message.chat_id)
+        phone_number = contact.phone_number
+        
+        # Save the phone number to database
+        if save_phone_number(chat_id, phone_number):
+            await context.bot.send_message(
+                chat_id=message.chat_id,
+                text="Спасибо! Ваш номер телефона сохранен."
+            )
+            log_info(f"Phone number for chat {chat_id} saved: {phone_number}", 'info')
+        else:
+            await context.bot.send_message(
+                chat_id=message.chat_id,
+                text="К сожалению, не удалось сохранить номер телефона. Пожалуйста, попробуйте позже."
+            )
+            log_info(f"Failed to save phone number for chat {chat_id}", 'error')
+    except Exception as e:
+        log_info(f"Error in handling contact message from {chat_id}", 'error')
+        raise e
+
+
+async def phone_command_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle /phone command to request user's phone number"""
+    try:
+        chat_id = update.effective_chat.id
+        
+        # Check if we already have the phone number
+        existing_phone = get_phone_number(str(chat_id))
+        if existing_phone:
+            await context.bot.send_message(
+                chat_id=chat_id,
+                text=f"У нас уже есть ваш номер телефона: {existing_phone}"
+            )
+            return
+            
+        # Create a keyboard with a button to share contact
+        keyboard = ReplyKeyboardMarkup(
+            [[KeyboardButton(text="Поделиться номером телефона", request_contact=True)]],
+            one_time_keyboard=True,
+            resize_keyboard=True
+        )
+        
+        await context.bot.send_message(
+            chat_id=chat_id,
+            text="Пожалуйста, поделитесь вашим номером телефона, нажав на кнопку ниже.",
+            reply_markup=keyboard
+        )
+        
+        log_info(f"Phone number requested from chat {chat_id}", 'info')
+    except Exception as e:
+        log_info(f"Error in handling phone command from {chat_id}", 'error')
+        raise e
+
+
+async def start_command_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle /start command to show available commands"""
+    try:
+        chat_id = update.effective_chat.id
+        
+        menu_text = (
+            "Добро пожаловать! Вот доступные команды:\n\n"
+            "/phone - Поделиться номером телефона или узнать сохраненный номер\n"
+            "/start - Показать это меню"
+        )
+        
+        await context.bot.send_message(
+            chat_id=chat_id,
+            text=menu_text
+        )
+        
+        log_info(f"Menu displayed for chat {chat_id}", 'info')
+    except Exception as e:
+        log_info(f"Error in handling start command from {chat_id}", 'error')
         raise e

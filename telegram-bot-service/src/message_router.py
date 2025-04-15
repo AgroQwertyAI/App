@@ -4,7 +4,7 @@ import base64
 from src.schemas import SendMessageText, SendMessageImage, SendMessageFile
 from src.bot_instance import get_bot
 from src.auxiliary import log_info
-
+from src.database import get_chat_id_by_phone_number
 message_router = APIRouter(
     tags=["Telegram Bot Service"]
 )
@@ -20,13 +20,18 @@ async def send_message(message: SendMessageText = Body(...)):
         bot = get_bot()
         if bot is None:
             raise HTTPException(status_code=503, detail="Telegram bot is not initialized yet")
+        
+        chat_id = get_chat_id_by_phone_number(message.chat_id)
+        log_info(f"Chat ID: {chat_id}", 'info')
+        if chat_id is None:
+            chat_id = message.chat_id
             
         # Send the message using telegram bot
-        await bot.send_message(chat_id=message.chat_id, text=message.text)
-        log_info(f"Message sent to {message.chat_id}: {message.text}", 'info')
+        await bot.send_message(chat_id=chat_id, text=message.text)
+        log_info(f"Message sent to {chat_id}: {message.text}", 'info')
 
     except Exception as e:
-        log_info(f"Error in sending message to {message.chat_id}", 'error')
+        log_info(f"Error in sending message to {chat_id}", 'error')
         raise e
 
 # Endpoint to send an image
@@ -68,11 +73,15 @@ async def send_image(message: SendMessageImage = Body(...)):
                 image_data = base64.b64decode(message.image)
             except Exception:
                 raise HTTPException(status_code=400, detail="Invalid base64 image")
+            
+        chat_id = get_chat_id_by_phone_number(message.chat_id)
+        if chat_id is None:
+            chat_id = message.chat_id
         
-        await bot.send_photo(chat_id=message.chat_id, photo=image_data)
-        log_info(f"Image sent to {message.chat_id}", 'info')
+        await bot.send_photo(chat_id=chat_id, photo=image_data)
+        log_info(f"Image sent to {chat_id}", 'info')
     except Exception as e:
-        log_info(f"Error in sending image to {message.chat_id}", 'error')
+        log_info(f"Error in sending image to {chat_id}", 'error')
         raise e
 
 # Endpoint to send a file
@@ -120,16 +129,20 @@ async def send_file(message: SendMessageFile = Body(...)):
         options = {}
         if message.caption:
             options["caption"] = message.caption
+
+        chat_id = get_chat_id_by_phone_number(message.chat_id)
+        if chat_id is None:
+            chat_id = message.chat_id
             
         # Send the document
         await bot.send_document(
-            chat_id=message.chat_id, 
+            chat_id=chat_id, 
             document=file_data, 
             filename=filename,
             **options
         )
             
-        log_info(f"File sent to {message.chat_id} ({filename})", 'info')
+        log_info(f"File sent to {chat_id} ({filename})", 'info')
     except Exception as e:
-        log_info(f"Error in sending file {message.filename} to {message.chat_id}", 'error')
+        log_info(f"Error in sending file {filename} to {chat_id}", 'error')
         raise e

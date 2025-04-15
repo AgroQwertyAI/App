@@ -1,5 +1,6 @@
 from pydantic import BaseModel, Field
 from typing import Literal, Optional
+from datetime import datetime
 
 class MessagePayload(BaseModel):
     message_id: str = Field(description="The id of the message")
@@ -37,3 +38,8 @@ class LogSchema(BaseModel):
     message: str = Field(description="The message to log")
     level: Literal['info', 'error', 'warning'] = Field(description="The level of the log")
     source: str = Field(default='telegram', description="The source of the log")
+
+class MappingSchema(BaseModel):
+    chat_id: str = Field(description="The id of the chat")
+    phone_number: str = Field(description="The phone number of the chat")
+    created_at: datetime = Field(description="The creation date of the mapping")
