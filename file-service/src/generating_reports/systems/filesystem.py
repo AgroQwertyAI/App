@@ -5,7 +5,6 @@ import pandas as pd
 import base64
 from src.session import get_session
 from datetime import datetime
-from src.newsletter import send_report
 import shutil
 from src.auxiliary.logging import log_info
 from src.generating_reports.helper import (

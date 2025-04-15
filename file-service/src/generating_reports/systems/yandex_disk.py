@@ -1,12 +1,13 @@
-from yadisk import YaDisk
-from datetime import datetime
+import yadisk
 import json
+from datetime import datetime
 import pandas as pd
 import base64
 import io
 from src.auxiliary.logging import log_info
 from src.session import get_session
 from pathlib import Path
+import asyncio
 from src.generating_reports.helper import (
     get_pending_messages, 
     aggregate_messages, 
@@ -34,7 +35,7 @@ def get_yandex_disk_config():
         return None
 
 
-def save_yandex_disk_report(setting: dict) -> str:
+async def save_yandex_disk_report(setting: dict) -> str:
     # Extract setting ID from the setting dictionary
     setting_id = setting["setting_id"]
     log_info(f"Saving report and sending messages for setting {setting_id}", 'info')
@@ -56,7 +57,7 @@ def save_yandex_disk_report(setting: dict) -> str:
             raise Exception("No Yandex OAuth token found")
         
         # Initialize YaDisk client
-        y = YaDisk(token=current_token)
+        y = yadisk.YaDisk(token=current_token)
         # Create report directories on Yandex Disk
         timestamp = datetime.now().strftime('%Y-%m-%d-%H-%M-%S')
 
@@ -68,7 +69,7 @@ def save_yandex_disk_report(setting: dict) -> str:
         if not y.exists(report_dir):
             y.makedirs(report_dir)
             y.makedirs(messages_dir)
-        
+
         # Generate xlsx file
         df = pd.DataFrame(aggregated_data)
         
@@ -89,38 +90,63 @@ def save_yandex_disk_report(setting: dict) -> str:
         report_id = save_report_to_db(setting_id, file, conn)
         
         messages_by_sender = group_messages_by_sender(pending_messages)
+
+        requests = []
         
+        y = yadisk.AsyncClient(token=current_token)
         # Process each sender's messages as a group
         for sender_id, sender_messages in messages_by_sender.items():
             user_dir = f"{messages_dir}/{sender_id}"
-            
+        
             # Create user directory on Yandex Disk
-            y.mkdir(user_dir)
-            
-            # Create messages directory
-            messages_folder = f"{user_dir}/messages"
-            y.mkdir(messages_folder)
+            requests.append(y.mkdir(user_dir))
+
+        await asyncio.gather(*requests)
+
+        requests = []
+        
+        for sender_id, sender_messages in messages_by_sender.items():
+            user_dir = f"{messages_dir}/{sender_id}"
             
             # 4.1 Save each message separately
             for i, message in enumerate(sender_messages):
                 # Create a folder for this message
-                message_folder = f"{messages_folder}/{i}"
-                y.mkdir(message_folder)
+                message_folder = f"{user_dir}/{i}"
+                requests.append(y.mkdir(message_folder))
+
+        await asyncio.gather(*requests)
+
+        requests = []
+
+        for sender_id, sender_messages in messages_by_sender.items():
+            user_dir = f"{messages_dir}/{sender_id}"
+
+            for i, message in enumerate(sender_messages):
+                message_folder = f"{user_dir}/{i}"
+                images_folder = f"{message_folder}/images"
+                requests.append(y.mkdir(images_folder))
                 
+        await asyncio.gather(*requests)
+
+        requests = []
+    
+        for sender_id, sender_messages in messages_by_sender.items():
+            user_dir = f"{messages_dir}/{sender_id}"
+
+            for i, message in enumerate(sender_messages):
+                message_folder = f"{user_dir}/{i}"
+                images_folder = f"{message_folder}/images"
+
                 # Save individual message text
                 text_buffer = io.BytesIO(message["original_message_text"].encode('utf-8'))
-                y.upload(text_buffer, f"{message_folder}/text.txt")
+                requests.append(y.upload(text_buffer, f"{message_folder}/text.txt"))
                 
                 # 4.2 Save formatted text associated with a message
                 formatted_text_buffer = io.BytesIO(message["formatted_message_text"].encode('utf-8'))
-                y.upload(formatted_text_buffer, f"{message_folder}/formatted_text.json")
+                requests.append(y.upload(formatted_text_buffer, f"{message_folder}/formatted_text.json"))
                 
                 # 4.3 save images
                 images = json.loads(message["images"]) if message["images"] else {"images": []}
-                
-                # Create images folder for this message
-                images_folder = f"{message_folder}/images"
-                y.mkdir(images_folder)
                 
                 # Save each image for this message
                 for j, image in enumerate(images["images"]):
@@ -130,20 +156,22 @@ def save_yandex_disk_report(setting: dict) -> str:
                         
                         # Upload image directly from memory with index suffix
                         image_buffer = io.BytesIO(image_binary)
-                        y.upload(image_buffer, f"{images_folder}/image_{j}.{image_extension}")
+                        requests.append(y.upload(image_buffer, f"{images_folder}/image_{j}.{image_extension}"))
                     except Exception as e:
                         log_info(f"Error saving image", 'error')
 
                 # save message to db
                 save_message_report_to_db(message, report_id, conn)
             
+        await asyncio.gather(*requests)
+
         # 4.4 Aggregate formatted_message_text JSON objects
         aggregated_json = get_aggregated_json_from_messages(pending_messages)
         
         # Save aggregated formatted text
         aggregated_json_buffer = io.BytesIO(json.dumps(aggregated_json).encode('utf-8'))
-        y.upload(aggregated_json_buffer, f"{report_dir}/formatted_text.json")
-        
+        await y.upload(aggregated_json_buffer, f"{report_dir}/formatted_text.json")
+
         # 6. Delete previous messages_pending for this setting
         delete_pending_messages(setting_id, conn)
         
@@ -155,7 +183,7 @@ def move_yandex_disk_report_to_deleted(setting_id: int):
         current_token = get_yandex_disk_config()["token"]
         
         # Initialize YaDisk client
-        y = YaDisk(token=current_token)
+        y = yadisk.YaDisk(token=current_token)
 
         shared_folder_name = get_yandex_disk_config()["shared_folder_name"]
         # Define source and target paths
