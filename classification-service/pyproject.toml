@@ -5,8 +5,10 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "aiohttp>=3.11.16",
     "dotenv>=0.9.9",
     "fastapi>=0.115.12",
+    "numpy>=2.2.4",
     "onnxruntime>=1.21.0",
     "onnxruntime-gpu>=1.21.0",
     "poethepoet>=0.33.1",
@@ -29,4 +31,3 @@ torchvision = [
 ]
 [tool.poe.tasks]
 start = "python -m main"
-test = "python -m request_tester"
