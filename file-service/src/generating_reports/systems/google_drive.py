@@ -76,28 +76,6 @@ def create_folder(service, name, parent_id=None):
     folder = service.files().create(body=file_metadata, fields='id').execute()
     return folder.get('id')
 
-def find_or_create_path(service, path):
-    """Find or create a path in Google Drive and return the last folder ID"""
-    parts = path.strip('/').split('/')
-    parent_id = None
-    
-    for part in parts:
-        # Search for the folder in the current parent
-        query = f"name='{part}' and mimeType='application/vnd.google-apps.folder'"
-        if parent_id:
-            query += f" and '{parent_id}' in parents"
-        
-        results = service.files().list(q=query, spaces='drive', fields='files(id)').execute()
-        items = results.get('files', [])
-        
-        if items:
-            parent_id = items[0]['id']
-        else:
-            # Folder doesn't exist, create it
-            parent_id = create_folder(service, part, parent_id)
-    
-    return parent_id
-
 def upload_file(service, file_content, filename, parent_id, mime_type):
     """Upload a file to Google Drive and return its ID"""
     file_metadata = {
