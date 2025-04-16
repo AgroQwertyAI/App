@@ -7,6 +7,7 @@ import logging
 from src.generating_reports.systems.filesystem import move_local_report_to_deleted
 from src.generating_reports.systems.yandex_disk import move_yandex_disk_report_to_deleted
 from src.generating_reports.systems.google_drive import move_google_drive_report_to_deleted
+from src.generating_reports.helper import delete_pending_messages
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -300,6 +301,12 @@ async def delete_setting(
         except Exception as e:
             # Log the error but don't fail the request
             logger.error(f"Error moving report folder for setting {id}: {str(e)}")
+
+        # Delete all pending messages for the setting
+        try:
+            delete_pending_messages(id, conn)
+        except Exception as e:
+            logger.error(f"Error deleting pending messages for setting {id}: {str(e)}")
 
         # Return 204 No Content
         return None

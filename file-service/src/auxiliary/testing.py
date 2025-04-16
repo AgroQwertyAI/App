@@ -5,6 +5,10 @@ from src.generating_reports.systems.google_drive import get_drive_service, find_
 from src.generating_reports.helper import get_pending_messages, aggregate_messages, convert_dataframe_to_bytes_xlsx
 import pandas as pd
 from sqlite3 import Connection
+from src.generating_reports.systems.yandex_disk import get_yandex_disk_config, get_yandex_disk_folder_path
+import yadisk
+import io
+from src.auxiliary.logging import log_info
 
 def get_message_number(sender_name: str, setting_id: int) -> int:
     """
@@ -107,11 +111,6 @@ def update_yandex_disk(message: MessagePendingPost, setting_id: int, conn: Conne
     file_name = f"{message.sender_name}_{message_number}_{formatted_date}.txt"
     text = message.original_message_text
     
-    # Get Yandex Disk config and token
-    from src.generating_reports.systems.yandex_disk import get_yandex_disk_config
-    import yadisk
-    import io
-    
     yandex_config = get_yandex_disk_config()
     if not yandex_config or not yandex_config.get("token"):
         raise Exception("Cannot access Yandex Disk token")
@@ -120,7 +119,7 @@ def update_yandex_disk(message: MessagePendingPost, setting_id: int, conn: Conne
     y = yadisk.YaDisk(token=yandex_config["token"])
     
     # Get shared folder name from config
-    shared_folder_name = yandex_config["shared_folder_name"]
+    shared_folder_name = get_yandex_disk_folder_path()
     base_path = f"/{shared_folder_name}"
     
     # Check if 'qwerty' folder exists, create if not

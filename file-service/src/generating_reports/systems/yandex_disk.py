@@ -33,7 +33,20 @@ def get_yandex_disk_config():
     except Exception as e:
         log_info(f"Error getting Yandex Disk config: {e}", 'error')
         return None
+    
+def get_yandex_disk_folder_path() -> str:
+    config = get_yandex_disk_config()
 
+    shared_folder_link_or_path = config["shared_folder_name"]
+    y = yadisk.YaDisk(token=config["token"])
+
+    try:
+        public_resource = y.get_public_meta(shared_folder_link_or_path)
+        return public_resource.name
+    except Exception:
+        pass
+
+    return shared_folder_link_or_path
 
 async def save_yandex_disk_report(setting: dict) -> str:
     # Extract setting ID from the setting dictionary
@@ -61,8 +74,9 @@ async def save_yandex_disk_report(setting: dict) -> str:
         # Create report directories on Yandex Disk
         timestamp = datetime.now().strftime('%Y-%m-%d-%H-%M-%S')
 
-        shared_folder_name = get_yandex_disk_config()["shared_folder_name"]
-        report_dir = f"/{shared_folder_name}/reports/active/{setting_id}/{timestamp}"
+        shared_folder_path = get_yandex_disk_folder_path()
+
+        report_dir = f"/{shared_folder_path}/reports/active/{setting_id}/{timestamp}"
         messages_dir = f"{report_dir}/messages"
         
         # Create directories on Yandex Disk if do not exist

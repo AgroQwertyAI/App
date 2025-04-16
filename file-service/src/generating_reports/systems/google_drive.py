@@ -105,15 +105,19 @@ def find_shared_folder(service):
     """Find a folder that has been shared with the service account"""
     # Get folder name from config, or use default
     config = get_google_drive_config()
-    folder_name = config["shared_folder_name"]
+    folder_name: str = config["shared_folder_name"]
+
+    if "drive/folders/" in folder_name:
+        names = [name for name in folder_name.split("/") if len(name) > 0]
+        return names[-1]
     
     query = f"name='{folder_name}' and mimeType='application/vnd.google-apps.folder' and trashed=false"
     results = service.files().list(q=query, spaces='drive', fields='files(id, name)').execute()
     items = results.get('files', [])
-    
+
     if not items:
-        log_info(f"Shared folder '{folder_name}' not found. Please make sure it's shared with the service account.", 'error')
-        return None
+        folder_id = folder_name
+        return folder_id
         
     return items[0]['id']
 
