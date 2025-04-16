@@ -34,7 +34,7 @@ async def get_messages_from_report(
             raise HTTPException(status_code=404, detail=f"Report not found for setting ID {setting_id} and report ID {report_id}")
         
         # Build query
-        query = "SELECT * FROM message_reports WHERE setting_id = ? AND report_id = ?"
+        query = "SELECT * FROM messages_reports WHERE setting_id = ? AND report_id = ?"
         params = [setting_id, report_id]
         
         # Add filter by user IDs if provided

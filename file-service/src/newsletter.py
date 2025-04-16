@@ -2,9 +2,8 @@ from typing import Literal
 import os
 import requests
 from dotenv import load_dotenv
-import logging
-
-logger = logging.getLogger(__name__)
+from src.config import logger
+from src.auxiliary.logging import log_info
 
 # Load environment variables
 load_dotenv()
@@ -22,7 +21,7 @@ def send_report(
         messenger: The messenger service to use ('telegram' or 'whatsapp')
         number: The user's contact number or chat ID
     """
-    logger.info(f"Starting to send report via {messenger} to {number}")
+    log_info(f"Starting to send report via {messenger} to {number}", 'info')
 
     # Only proceed if messenger is whatsapp
     if messenger != "whatsapp":

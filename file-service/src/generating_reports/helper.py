@@ -2,6 +2,9 @@ from sqlite3 import Connection
 import json
 from datetime import datetime
 import base64
+import io
+import pandas as pd
+from collections import defaultdict
 
 def get_pending_messages(setting_id: int, conn: Connection) -> list[dict]:
     cursor = conn.cursor()
@@ -82,3 +85,30 @@ def delete_pending_messages(setting_id: int, conn: Connection) -> bool:
         (setting_id,)
     )
     return cursor.rowcount > 0
+
+def convert_dataframe_to_bytes_xlsx(df: pd.DataFrame) -> bytes:
+    buffer = io.BytesIO()
+    df.to_excel(buffer, index=False)
+    buffer.seek(0)
+    file_content = buffer.read()
+    return file_content
+
+def get_aggregated_json_from_messages(messages: list[dict]) -> dict:
+    aggregated_json = {}
+    for message in messages:
+        message_json = json.loads(message["formatted_message_text"])
+        for field, values in message_json.items():
+            if field not in aggregated_json:
+                aggregated_json[field] = []
+            aggregated_json[field].extend(values)
+
+    return aggregated_json
+
+def group_messages_by_sender(messages: list[dict]) -> dict:
+    # Group messages by sender_id
+    messages_by_sender = defaultdict(list)
+    for message in messages:
+        sender_id = message["sender_id"]
+        messages_by_sender[sender_id].append(message)
+
+    return messages_by_sender

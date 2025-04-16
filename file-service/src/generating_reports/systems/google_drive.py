@@ -1,5 +1,5 @@
 from googleapiclient.discovery import build
-from googleapiclient.http import MediaIoBaseUpload, MediaInMemoryUpload
+from googleapiclient.http import MediaIoBaseUpload, MediaInMemoryUpload, HttpRequest
 from google.oauth2 import service_account
 from datetime import datetime
 import json
@@ -7,20 +7,23 @@ import pandas as pd
 import base64
 import io
 from src.session import get_session
-from src.newsletter import send_report
 from pathlib import Path
 import tempfile
 import os
+import asyncio
+import httpx
+from src.auxiliary.logging import log_info
 from src.generating_reports.helper import (
     get_pending_messages, 
     aggregate_messages, 
     save_report_to_db,
     get_image_binary_from_base64,
     save_message_report_to_db,
-    delete_pending_messages
+    delete_pending_messages,
+    convert_dataframe_to_bytes_xlsx,
+    group_messages_by_sender,
+    get_aggregated_json_from_messages
 )
-from collections import defaultdict
-from src.config import logger
 
 OAUTH_CONFIG_DIR = Path("/config")
 CONFIG_FILE_GOOGLE_DRIVE = OAUTH_CONFIG_DIR / "google_drive_credentials.json"
@@ -31,9 +34,9 @@ def get_google_drive_config():
         with open(CONFIG_FILE_GOOGLE_DRIVE, "r") as f:
             data = json.load(f)
             return data
-    except Exception as e:
-        logger.error(f"Error getting Google Drive config: {e}")
-        return None
+    except Exception:
+        log_info(f"Error getting Google Drive config", 'error')
+        raise
 
 def get_drive_service():
     """Create and return a Google Drive service instance"""
@@ -62,8 +65,8 @@ def get_drive_service():
         if os.path.exists(temp_filename):
             os.unlink(temp_filename)
 
-def create_folder(service, name, parent_id=None):
-    """Create a folder in Google Drive and return its ID"""
+def create_folder(service, name, parent_id=None) -> HttpRequest:
+    """Create a folder in Google Drive and return http request"""
     file_metadata = {
         'name': name,
         'mimeType': 'application/vnd.google-apps.folder'
@@ -71,33 +74,11 @@ def create_folder(service, name, parent_id=None):
     if parent_id:
         file_metadata['parents'] = [parent_id]
     
-    folder = service.files().create(body=file_metadata, fields='id').execute()
-    return folder.get('id')
+    folder = service.files().create(body=file_metadata, fields='id')
+    return folder
 
-def find_or_create_path(service, path):
-    """Find or create a path in Google Drive and return the last folder ID"""
-    parts = path.strip('/').split('/')
-    parent_id = None
-    
-    for part in parts:
-        # Search for the folder in the current parent
-        query = f"name='{part}' and mimeType='application/vnd.google-apps.folder'"
-        if parent_id:
-            query += f" and '{parent_id}' in parents"
-        
-        results = service.files().list(q=query, spaces='drive', fields='files(id)').execute()
-        items = results.get('files', [])
-        
-        if items:
-            parent_id = items[0]['id']
-        else:
-            # Folder doesn't exist, create it
-            parent_id = create_folder(service, part, parent_id)
-    
-    return parent_id
-
-def upload_file(service, file_content, filename, parent_id, mime_type):
-    """Upload a file to Google Drive and return its ID"""
+def upload_file(service, file_content, filename, parent_id, mime_type) -> HttpRequest:
+    """Upload a file to Google Drive and return http request"""
     file_metadata = {
         'name': filename,
         'parents': [parent_id]
@@ -116,9 +97,9 @@ def upload_file(service, file_content, filename, parent_id, mime_type):
         body=file_metadata,
         media_body=media,
         fields='id'
-    ).execute()
+    )
     
-    return file.get('id')
+    return file
 
 def find_shared_folder(service):
     """Find a folder that has been shared with the service account"""
@@ -131,22 +112,19 @@ def find_shared_folder(service):
     items = results.get('files', [])
     
     if not items:
-        logger.error(f"Shared folder '{folder_name}' not found. Please make sure it's shared with the service account.")
+        log_info(f"Shared folder '{folder_name}' not found. Please make sure it's shared with the service account.", 'error')
         return None
         
     return items[0]['id']
 
-def save_google_drive_report_and_send_messages(setting: dict) -> bool:
+async def save_google_drive_report(setting: dict) -> str:
     # Extract setting ID from the setting dictionary
     setting_id = setting["setting_id"]
-    logger.info(f"Saving report and sending messages for setting {setting_id}")
+    log_info(f"Saving report and sending messages for setting {setting_id}", 'info')
 
     with get_session() as conn:
         # 1. Fetch all pending messages associated with the setting
         pending_messages = get_pending_messages(setting_id, conn)
-        
-        if not pending_messages:
-            return False
         
         # 2. Aggregate formatted text into one JSON
         aggregated_data = aggregate_messages(pending_messages)
@@ -160,7 +138,7 @@ def save_google_drive_report_and_send_messages(setting: dict) -> bool:
         # Find the shared agriculture folder
         base_folder_id = find_shared_folder(service)
         if not base_folder_id:
-            logger.error("Cannot proceed without access to the shared folder")
+            log_info("Cannot proceed without access to the shared folder", 'error')
             return False
         
         # Create report directories on Google Drive with the shared folder as base
@@ -177,10 +155,10 @@ def save_google_drive_report_and_send_messages(setting: dict) -> bool:
             if items:
                 current_parent_id = items[0]['id']
             else:
-                current_parent_id = create_folder(service, folder_name, current_parent_id)
+                current_parent_id = create_folder(service, folder_name, current_parent_id).execute()['id']
         
         report_dir_id = current_parent_id
-        messages_dir_id = create_folder(service, "messages", report_dir_id)
+        messages_dir_id = create_folder(service, "messages", report_dir_id).execute()['id']
         
         # Generate xlsx file
         df = pd.DataFrame(aggregated_data)
@@ -188,11 +166,7 @@ def save_google_drive_report_and_send_messages(setting: dict) -> bool:
         # Create base64 encoded file content
         file = ""
         if report_format == "xlsx":
-            # Create Excel file in memory
-            buffer = io.BytesIO()
-            df.to_excel(buffer, index=False)
-            buffer.seek(0)
-            file_content = buffer.read()
+            file_content = convert_dataframe_to_bytes_xlsx(df)
             
             # Upload to Google Drive directly from memory
             memory_file = io.BytesIO(file_content)
@@ -202,94 +176,213 @@ def save_google_drive_report_and_send_messages(setting: dict) -> bool:
                 f"report.{report_format}", 
                 report_dir_id,
                 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-            )
+            ).execute()
             
             # Create base64 encoded version for database
             file = f"data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,{base64.b64encode(file_content).decode('utf-8')}"
         
         # 4. Create a new Report record
         report_id = save_report_to_db(setting_id, file, conn)
+        
+        messages_by_sender = group_messages_by_sender(pending_messages)
 
-        for message in json.loads(setting['send_to']) if isinstance(setting['send_to'], str) else setting['send_to']:
-            send_report(file, message['messenger'], message['phone_number'])
-        
-        # Group messages by sender_id
-        messages_by_sender = defaultdict(list)
-        for message in pending_messages:
-            sender_id = message["sender_id"]
-            messages_by_sender[sender_id].append(message)
-        
-        # Process each sender's messages as a group
-        for sender_id, sender_messages in messages_by_sender.items():
-            # Create user directory on Google Drive
-            user_dir_name = str(sender_id)
-            user_dir_id = create_folder(service, user_dir_name, messages_dir_id)
-            
-            # 1. Aggregate original_message_text with [SEP] separators
-            aggregated_text = ""
-            for i, message in enumerate(sender_messages):
-                if i > 0:
-                    aggregated_text += "\n[SEP]\n"
-                aggregated_text += message["original_message_text"]
-            
-            # Save aggregated raw text
-            upload_file(
-                service,
-                aggregated_text.encode('utf-8'),
-                "raw_text.txt",
-                user_dir_id,
-                'text/plain'
-            )
-            
-            # 2. Aggregate formatted_message_text JSON objects
-            aggregated_json = {}
-            for message in sender_messages:
-                message_json = json.loads(message["formatted_message_text"])
-                for field, value in message_json.items():
-                    if field not in aggregated_json:
-                        aggregated_json[field] = [value]
-                    else:
-                        aggregated_json[field].append(value)
-            
-            # Save aggregated formatted text
-            upload_file(
-                service,
-                json.dumps(aggregated_json).encode('utf-8'),
-                "formatted_text.json",
-                user_dir_id,
-                'application/json'
-            )
-            
-            # Handle images from all messages
-            i = 0
-            for message in sender_messages:
-                images = json.loads(message["images"]) if message["images"] else {"images": []}
-                for image in images["images"]:
-                    # Save the base64 encoded image with index to keep them separate
-                    try:
-                        image_binary, image_extension = get_image_binary_from_base64(image)
-                        
-                        # Upload image directly from memory with index suffix
-                        mime_type = f"image/{image_extension}" if image_extension != "jpg" else "image/jpeg"
-                        upload_file(
-                            service,
-                            image_binary,
-                            f"image_{i}.{image_extension}",
-                            user_dir_id,
-                            mime_type
+        async with httpx.AsyncClient() as client:
+            requests = []
+
+            for sender_id, sender_messages in messages_by_sender.items():
+                requests.append(
+                    client.post(
+                        "https://www.googleapis.com/drive/v3/files", 
+                        headers={
+                            "Authorization": f"Bearer {service._http.credentials.token}",
+                            "Content-Type": "application/json"
+                        },
+                        json={
+                            "name": str(sender_id), 
+                            "parents": [messages_dir_id],
+                            "mimeType": "application/vnd.google-apps.folder"
+                        }
+                    )
+                )
+
+            user_folders = await asyncio.gather(*requests)
+            user_folders_ids = [resp.json()['id'] for resp in user_folders]
+
+
+
+        user_requests: dict[str, list[httpx.Request]] = {}
+        async with httpx.AsyncClient() as client:
+            for user_folder_id, sender_messages in zip(user_folders_ids, messages_by_sender.values()):
+                user_requests[user_folder_id] = []
+
+                for i, message in enumerate(sender_messages):
+                    user_requests[user_folder_id].append(
+                        client.post(
+                            "https://www.googleapis.com/drive/v3/files", 
+                            headers={
+                                "Authorization": f"Bearer {service._http.credentials.token}",
+                                "Content-Type": "application/json"
+                            },
+                            json={
+                                "name": str(i), 
+                                "parents": [user_folder_id],
+                                "mimeType": "application/vnd.google-apps.folder"
+                            }
                         )
-                        i += 1
-                    except Exception as e:
-                        logger.error(f"Error saving image: {e}")
+                    )
+
+            user_message_id_to_folder_id: dict[str, list[str]] = {}
+
+            for user_folder_id, requests in user_requests.items():
+                message_folders = await asyncio.gather(*requests)
+                message_folders_ids = [resp.json()['id'] for resp in message_folders]
+
+                user_message_id_to_folder_id[user_folder_id] = message_folders_ids
+
+
+
+        #create images folder for every message
+        async with httpx.AsyncClient() as client:
+            image_folder_requests: list[httpx.Request] = []
+
+            for i, (sender_id, sender_messages) in enumerate(messages_by_sender.items()):
+                # Create user directory on Google Drive
+                user_dir_id = user_folders_ids[i]
+                
+                # 4.1 Save each message separately
+                for message, message_folder_id in zip(sender_messages, user_message_id_to_folder_id[user_dir_id]):
+                    # Save individual message text
+
+                    image_folder_requests.append(client.post(
+                            "https://www.googleapis.com/drive/v3/files", 
+                            headers={
+                                "Authorization": f"Bearer {service._http.credentials.token}",
+                                "Content-Type": "application/json"
+                            },
+                            json={
+                                "name": "images", 
+                                "parents": [message_folder_id],
+                                "mimeType": "application/vnd.google-apps.folder"
+                            }
+                        )
+                    )
+
+            image_folders = await asyncio.gather(*image_folder_requests)
+            message_id_to_image_folder_id = {}
             
-            # Create MessageReport records for each original message
-            for message in sender_messages:
-                save_message_report_to_db(message, report_id, conn)
+            j = 0
+            for i ,(sender_id, sender_messages) in enumerate(messages_by_sender.items()):
+                user_dir_id = user_folders_ids[i]
+                
+                # 4.1 Save each message separately
+                for message, message_folder_id in zip(sender_messages, user_message_id_to_folder_id[user_dir_id]):
+                    # Save individual message text
+
+                    message_id_to_image_folder_id[message_folder_id] = image_folders[j].json()['id']
+                    j += 1
+
+        async with httpx.AsyncClient() as client:
+            requests = []
+            log_info("uploading user_messages", 'info')
+
+            # Process each sender's messages as a group
+            for i, (sender_id, sender_messages) in enumerate(messages_by_sender.items()):
+                log_info(f"uploading messages for user {sender_id}", 'info')
+                # Create user directory on Google Drive
+                user_dir_id = user_folders_ids[i]
+                
+                # 4.1 Save each message separately
+                for i, (message, message_folder_id) in enumerate(zip(sender_messages, user_message_id_to_folder_id[user_dir_id])):
+                    # Save individual message text
+                    requests.append(client.post(
+                        "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart",
+                        headers={
+                            "Authorization": f"Bearer {service._http.credentials.token}",
+                            "Content-Type": "multipart/related; boundary=boundary",
+                        },
+                        content=(
+                            "--boundary\r\n"
+                            "Content-Type: text/plain\r\n\r\n"
+                            f'{{"name": "text.txt", "parents": ["{message_folder_id}"]}}\r\n'
+                            "--boundary\r\n"
+                            "Content-Type: text/plain\r\n\r\n"
+                            f"{message['original_message_text']}\r\n"
+                            "--boundary--"
+                        ),
+                    ))
+
+                    requests.append(client.post(
+                        "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart",
+                        headers={
+                            "Authorization": f"Bearer {service._http.credentials.token}",
+                            "Content-Type": "multipart/related; boundary=boundary",
+                        },
+                        content=(
+                            "--boundary\r\n"
+                            "Content-Type: application/json\r\n\r\n"
+                            f'{{"name": "formatted_text.json", "parents": ["{message_folder_id}"]}}\r\n'
+                            "--boundary\r\n"
+                            "Content-Type: application/json\r\n\r\n"
+                            f"{message['formatted_message_text']}\r\n"
+                            "--boundary--"
+                        ),
+                    ))
+
+                    # 4.3 save images
+                    images = json.loads(message["images"]) if message["images"] else {"images": []}
+                    
+                    # Save each image for this message
+                    for j, image in enumerate(images["images"]):
+                        # Save the base64 encoded image with index to keep them separate
+                        try:
+                            image_binary, image_extension = get_image_binary_from_base64(image)
+                            
+                            # Upload image directly from memory with index suffix
+                            mime_type = f"image/{image_extension}" if image_extension != "jpg" else "image/jpeg"
+                            
+                            image_request = client.post(
+                                "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart",
+                                headers={
+                                    "Authorization": f"Bearer {service._http.credentials.token}",
+                                    "Content-Type": "multipart/related; boundary=boundary",
+                                },
+                                content=(
+                                    "--boundary\r\n"
+                                    "Content-Type: application/json\r\n\r\n"
+                                    f'{{"name": "{str(j)}.{image_extension}", "parents": ["{message_id_to_image_folder_id[message_folder_id]}"], "mimeType": "{mime_type}"}}\r\n'
+                                    "--boundary\r\n"
+                                    f"Content-Type: {mime_type}\r\n\r\n"
+                                    f"{image_binary}\r\n"  # Binary image data
+                                    "--boundary--"
+                                ),
+                            )
+
+                            requests.append(image_request)
+
+                        except Exception as e:
+                            log_info(f"Error saving image: {e}", 'error')
+
+                    # save message to db
+                    save_message_report_to_db(message, report_id, conn)
+
+            await asyncio.gather(*requests)
+
+        # 4.4 Aggregate formatted_message_text JSON objects
+        aggregated_json = get_aggregated_json_from_messages(pending_messages)
+        
+        # Save aggregated formatted text
+        upload_file(
+            service,
+            json.dumps(aggregated_json).encode('utf-8'),
+            "formatted_text.json",
+            report_dir_id,
+            'application/json'
+        ).execute()
         
         # 6. Delete previous messages_pending for this setting
         delete_pending_messages(setting_id, conn)
-        
-    return True
+            
+        return file
 
 def move_google_drive_report_to_deleted(setting_id: int):
     try:
@@ -299,7 +392,7 @@ def move_google_drive_report_to_deleted(setting_id: int):
         # Find the shared agriculture folder
         base_folder_id = find_shared_folder(service)
         if not base_folder_id:
-            logger.error("Cannot proceed without access to the shared folder")
+            log_info("Cannot proceed without access to the shared folder", 'error')
             return
         
         # Find reports folder in the shared folder
@@ -308,7 +401,7 @@ def move_google_drive_report_to_deleted(setting_id: int):
         reports_items = reports_results.get('files', [])
         
         if not reports_items:
-            logger.error("Reports folder not found in the shared folder")
+            log_info("Reports folder not found in the shared folder", 'error')
             return
             
         reports_id = reports_items[0]['id']
@@ -319,7 +412,7 @@ def move_google_drive_report_to_deleted(setting_id: int):
         active_items = active_results.get('files', [])
         
         if not active_items:
-            logger.error("Active folder not found in the reports folder")
+            log_info("Active folder not found in the reports folder", 'error')
             return
             
         active_folder_id = active_items[0]['id']
@@ -330,7 +423,7 @@ def move_google_drive_report_to_deleted(setting_id: int):
         setting_items = setting_results.get('files', [])
         
         if not setting_items:
-            logger.info(f"Setting folder {setting_id} not found in the active folder")
+            log_info(f"Setting folder {setting_id} not found in the active folder", 'error')
             return
             
         source_folder_id = setting_items[0]['id']
@@ -354,8 +447,8 @@ def move_google_drive_report_to_deleted(setting_id: int):
             fields='id, parents'
         ).execute()
         
-        logger.info(f"Moved report folder for setting ID {setting_id} to deleted")
+        log_info(f"Moved report folder for setting ID {setting_id} to deleted", 'info')
     
     except Exception as e:
-        logger.error(f"Error moving report for setting ID {setting_id}: {str(e)}")
+        log_info(f"Error moving report for setting ID {setting_id}: {e}", 'error')
         raise

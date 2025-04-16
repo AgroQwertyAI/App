@@ -26,6 +26,8 @@ COPY . .
 COPY start.sh /start.sh
 RUN chmod +x /start.sh
 
+RUN chmod +x /app/src/save_report.py
+
 # Expose port for the FastAPI application
 EXPOSE 52001
 

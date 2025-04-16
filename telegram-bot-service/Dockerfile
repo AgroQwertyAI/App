@@ -12,5 +12,7 @@ RUN pip install -e .
 # Copy the rest of the application
 COPY . .
 
+EXPOSE 7998
+
 # Command to run the application using the startup script with auto-reload
-CMD ["python", "run_with_reload.py"]
+CMD ["python", "main.py"]

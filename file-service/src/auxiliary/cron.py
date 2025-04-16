@@ -3,7 +3,7 @@ import sys
 from crontab import CronTab
 from src.schemas.endpoints.setting import SettingPost
 from src.config import logger
-
+from src.auxiliary.logging import log_info
 # Path to the cron configuration directory
 CRON_CONFIG_DIR = "/var/spool/cron/crontabs"
 
@@ -35,10 +35,10 @@ def create_cron_job(setting_id: int, setting: SettingPost):
         
         # Write the crontab
         cron.write()
-        logger.info(f"Created cron job for setting ID {setting_id}")
+        log_info(f"Created cron job for setting ID {setting_id}", 'info')
         return True
     except Exception as e:
-        logger.error(f"Error creating cron job: {str(e)}")
+        log_info(f"Error creating cron job: {e}", 'error')
         raise
 
 def delete_cron_job(setting_id: int):
@@ -72,9 +72,9 @@ def delete_cron_job(setting_id: int):
         # Write the changes to the crontab
         if job_found:
             cron.write()
-            logger.info(f"Deleted cron job for setting ID {setting_id}")
+            log_info(f"Deleted cron job for setting ID {setting_id}", 'info')
         
         return job_found
     except Exception as e:
-        logger.error(f"Error deleting cron job: {str(e)}")
+        log_info(f"Error deleting cron job: {e}", 'error')
         raise

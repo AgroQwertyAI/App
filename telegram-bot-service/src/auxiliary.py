@@ -1,43 +1,56 @@
 import aiohttp
-from src.config import logger
-from src.config import MESSENGER_API_SERVICE_URL
+from src.config import MESSENGER_API_SERVICE_URL, BACKEND_SERVICE_URL, logger
 from src.schemas import MessagePayload, ChatRegistrationSchema
 import base64
+import httpx
+from src.schemas import LogSchema
+from typing import Literal
+
+def log_info(message: str, level: Literal['info', 'error', 'warning']):
+    if level == 'info':
+        logger.info(message)
+    elif level == 'error':
+        logger.error(message)
+    elif level == 'warning':
+        logger.warning(message)
+
+    with httpx.Client() as client:
+        try:
+            client.post(
+                f"{BACKEND_SERVICE_URL}/logs",
+                json=LogSchema(message=message, level=level).model_dump()
+            )
+        except Exception as e:
+            logger.error(f"Failed to send log to backend service: {e}")
 
 async def register_chat(chat_registration: ChatRegistrationSchema) -> None:
-    logger.info(f"Registering chat {chat_registration.chat_id} with name {chat_registration.chat_name}")
     async with aiohttp.ClientSession() as session:
         async with session.post(
             f"{MESSENGER_API_SERVICE_URL}/chats", 
             json=chat_registration.model_dump()
         ) as response:
             if response.status != 200:
-                logger.error(f"Failed to register chat, status code: {response.status}")
+                log_info(f"Failed to register chat, status code: {response.status}", 'error')
             else:
-                logger.info("Chat registered successfully.")
+                log_info("Chat registered successfully.", 'info')
 
 
 async def unregister_chat(chat_id: str) -> None:
-    logger.info(f"Unregistering chat {chat_id}")
     async with aiohttp.ClientSession() as session:
         async with session.delete(f"{MESSENGER_API_SERVICE_URL}/chats/{chat_id}") as resp:
             if resp.status == 200:
-                logger.info(f"Chat unregistered successfully: {chat_id}")
+                log_info(f"Chat unregistered successfully: {chat_id}", 'info')
             else:
-                logger.error(f"Failed to unregister chat {chat_id}, status: {resp.status}")
+                log_info(f"Failed to unregister chat {chat_id}, status: {resp.status}", 'error')
 
 
 async def send_new_message(message: MessagePayload) -> None:
-    logger.info(f"Sending new message: {message.message_id}")
     async with aiohttp.ClientSession() as session:
         async with session.post(
             f"{MESSENGER_API_SERVICE_URL}/api/llm_processing", 
             json=message.model_dump()
-        ) as response:
-            if response.status != 200:
-                logger.error(f"Failed to forward message, status code: {response.status}")
-            else:
-                logger.info("Message forwarded successfully.")
+        ):
+            pass
 
 
 async def get_blob_photo(photo) -> str | None:
