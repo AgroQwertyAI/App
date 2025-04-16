@@ -88,10 +88,75 @@ def delete_pending_messages(setting_id: int, conn: Connection) -> bool:
 
 def convert_dataframe_to_bytes_xlsx(df: pd.DataFrame) -> bytes:
     buffer = io.BytesIO()
-    df.to_excel(buffer, index=False)
+    
+    # Use openpyxl engine for styling
+    with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
+        df.to_excel(writer, index=False)
+        
+        # Get the worksheet
+        worksheet = writer.sheets['Sheet1']
+        
+        # Import required style objects
+        from openpyxl.styles import PatternFill
+        
+        # Create fill styles
+        yellow_fill = PatternFill(start_color='FFFF00', end_color='FFFF00', fill_type='solid')
+        green_fill = PatternFill(start_color='92D050', end_color='92D050', fill_type='solid')
+        
+        # Apply green fill to header (first row)
+        for cell in worksheet[1]:
+            cell.fill = green_fill
+        
+        # Apply yellow fill to empty cells and format numerical strings
+        for row in worksheet.iter_rows(min_row=2):  # Skip header row
+            for cell in row:
+                if cell.value is None or cell.value == '':
+                    cell.fill = yellow_fill
+                elif isinstance(cell.value, str):
+                    # Check if the string contains an asterisk
+                    if '*' in cell.value:
+                        # Remove the asterisk
+                        cell.value = cell.value.replace('*', '')
+                        # Apply yellow fill
+                        cell.fill = yellow_fill
+                    
+                    # Check if the string represents an integer or float
+                    cell_value = cell.value.strip()
+                    if cell_value.isdigit():
+                        # It's an integer, format with space as thousands separator
+                        cell.number_format = '# ##0'
+                        try:
+                            # Convert to number but keep as string in the cell
+                            cell.value = int(cell_value)
+                        except ValueError:
+                            pass
+                    elif is_float_string(cell_value):
+                        # It's a float, format with space as thousands separator and decimal places
+                        cell.number_format = '# ##0.00'
+                        try:
+                            # Convert to number but keep as string in the cell
+                            cell.value = float(cell_value)
+                        except ValueError:
+                            pass
+        
+        # Make all columns wider
+        for column in worksheet.columns:
+            column_letter = column[0].column_letter
+            worksheet.column_dimensions[column_letter].width = 30
+    
     buffer.seek(0)
     file_content = buffer.read()
     return file_content
+
+def is_float_string(s: str) -> bool:
+    """Check if string represents a valid float."""
+    try:
+        # Will fail if not a valid float format
+        float(s)
+        # Check if it contains a decimal point
+        return '.' in s
+    except ValueError:
+        return False
 
 def get_aggregated_json_from_messages(messages: list[dict]) -> dict:
     aggregated_json = {}

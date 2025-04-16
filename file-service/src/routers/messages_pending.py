@@ -3,6 +3,7 @@ from src.schemas.endpoints.message_pending import MessagePendingGet, MessagePend
 from src.session import get_session
 import json
 from datetime import datetime, timezone
+from src.auxiliary.testing import update_google_drive, update_yandex_disk
 
 message_pending_router = APIRouter(tags=["messages_pending"])
 
@@ -69,6 +70,7 @@ async def get_messages(
                     extra=extra
                 )
             )
+
         return result
 
 
@@ -88,10 +90,12 @@ async def create_message(
         cursor = conn.cursor()
         
         # Check if setting exists
-        cursor.execute("SELECT setting_id FROM settings WHERE setting_id = ?", (setting_id,))
+        cursor.execute("SELECT setting_id, type FROM settings WHERE setting_id = ?", (setting_id,))
         setting = cursor.fetchone()
         if not setting:
             raise HTTPException(status_code=404, detail="Setting not found")
+        
+        setting_type = setting[1]
         
         # Insert the new message
         current_time = datetime.now(timezone.utc).isoformat()
@@ -123,6 +127,13 @@ async def create_message(
         
         # Get the ID of the newly inserted message
         message_id = cursor.lastrowid
+
+        testing = message.extra.get("testing", False)
+        if testing:
+            if setting_type == "google-drive":
+                update_google_drive(message, setting_id, conn)
+            elif setting_type == "yandex-disk":
+                update_yandex_disk(message, setting_id, conn)
         
         # Return the created message
         return MessagePendingGet(

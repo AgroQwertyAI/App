@@ -34,7 +34,7 @@ class MessagePendingPost(BaseModel):
     )
 
     images: Images = Field(description="The images of the message")
-    extra: dict = Field(description="The extra information about the message", example={})
+    extra: dict = Field(description="The extra information about the message", example={"testing": False})
 
 
 class MessagePendingPut(BaseModel):
