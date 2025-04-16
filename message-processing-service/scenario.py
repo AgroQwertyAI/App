@@ -1,6 +1,10 @@
+import asyncio
+
 import json
 
 from llm import chat
+
+from bert import is_report_bert
 
 STRAGEGY = "CSV"
 MODEL_NAME = "Mistral"
@@ -33,7 +37,11 @@ async def agentic(history: list, message: str):
     
     return {"history": payload, "answer": result}
 
-async def is_report(message: str) -> bool:
+async def is_report(message: str, use_bert: bool = True) -> bool:
+    if use_bert:
+        from bert import is_report_bert
+        return await is_report_bert(message)
+    
     payload = [
         {
             "role": "system",
@@ -51,7 +59,7 @@ async def is_report(message: str) -> bool:
     return 'REPORT' in result
 
 async def split_report(message: str, prompt = None) -> list:
-    instr = f"Пользователь даст тебе отчёт из чата и перед тобой стоит задача разделить его на отдельные события. Исходный формат в свободном формате и может иметь сокращения. Вот возможные операции: 1-я междурядная культивация, 2-я междурядная культивация, Боронование довсходовое, Внесение минеральных удобрений, Выравнивание зяби, 2-е Выравнивание зяби, Гербицидная обработка, 1 Гербицидная обработка, 2 Гербицидная обработка, 3 Гербицидная обработка, 4 Гербицидная обработка, Дискование, Дискование 2-е, Инсектицидная обработка, Культивация, Пахота, Подкормка, Предпосевная культивация, Прикатывание посевов, Сев, Сплошная культивация, Уборка, Функицидная обработка, Чизлевание. Твоя задача - вывести списком разделенные на отдельные сообщения события. Для каждого события из исходного сообщения нужно в точности переписать все относящиеся к нему данные. Если в сообщении была информация относящаяся ко всем событиям - дата для всех сообщений или название подразделения, тебе нужно переписать их в дополнении к каждому разделенному сообщению. Некоторые события могут быть не полными и содержать не все поля. Внимание, формат вывода: тебе нужно вывести результат в качестве json обьекта с полем separated_reports типа массива строк. Json должен быть корректным для парсинга."
+    instr = f"Пользователь даст тебе отчёт из чата и перед тобой стоит задача разделить его по операциям. Исходный формат в свободном стиле и может иметь сокращения. Вот возможные операции: 1-я междурядная культивация, 2-я междурядная культивация, Боронование довсходовое, Внесение минеральных удобрений, Выравнивание зяби, 2-е Выравнивание зяби, Гербицидная обработка, 1 Гербицидная обработка, 2 Гербицидная обработка, 3 Гербицидная обработка, 4 Гербицидная обработка, Дискование, Дискование 2-е, Инсектицидная обработка, Культивация, Пахота, Подкормка, Предпосевная культивация, Прикатывание посевов, Сев, Сплошная культивация, Уборка, Функицидная обработка, Чизлевание. Твоя задача - вывести списком разделенные по операциям сообщения. Для каждой операции из исходного сообщения нужно в точности переписать все относящиеся к нему данные. Если в сообщении была информация относящаяся ко всем операциям - дата для всех сообщений или название подразделений, тебе нужно переписать их в дополнении к каждому разделенному сообщению с операцией. Некоторые операции могут быть не полными и содержать не все поля. Внимание, формат вывода: тебе нужно вывести результат в качестве json обьекта с полем separated_reports типа массива строк. Json должен быть корректным для парсинга. Не выводи никакой разметки кроме корректного json."
     if prompt:
         instr =  prompt
     
@@ -80,20 +88,33 @@ async def split_report(message: str, prompt = None) -> list:
     }
     
     result = await chat("mist", payload, structure=structure)
-    parsed_result = json.loads(result.choices[0].message.content)
-    
-    return parsed_result.get("separated_reports", [])
+    try:
+        content = result.choices[0].message.content
+        # In case LLM returns text before or after the JSON
+        if '{' in content and '}' in content:
+            json_part = content[content.find('{'):content.rfind('}')+1]
+            parsed_result = json.loads(json_part)
+        else:
+            parsed_result = json.loads(content)
+            
+        return parsed_result.get("separated_reports", [])
+    except json.JSONDecodeError as e:
+        print(f"Error parsing JSON response: {e}")
+        print(f"Raw content: {result.choices[0].message.content}")
+        return []
+
 
 
 async def extract_data_from_message(message: str, template: dict) -> dict:
     result = []
     
+    print("TASK SPLIT PROMPT", template.get("taskSplitPrompt"))
+    
     split = await split_report(message, template.get("taskSplitPrompt"))
     
-    print(split)
     
-    for message in split:
-        result.append(await extract_csv(message, template.get("systemPrompt")))
+    tasks = [extract_csv(msg, template.get("systemPrompt")) for msg in split]
+    result = await asyncio.gather(*tasks)
     
     return result
 
@@ -148,8 +169,11 @@ async def extract_csv(message: str, prompt = None) -> dict:
         }
     ]
     
-    result = await chat("mist", payload)
+    result = await chat("yagpt", payload)
     result = result.choices[0].message.content
+    
+    print(result)
+    
     
     csv_data = None
     data = []

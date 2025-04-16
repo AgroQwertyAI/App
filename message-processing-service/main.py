@@ -9,6 +9,7 @@ from typing import Dict, Any, Optional
 from dotenv import load_dotenv
 import traceback # For logging
 
+from whisper import transcribe_audio
 from agent import Agent
 
 # Configure logging
@@ -38,6 +39,7 @@ class NewMessageRequest(BaseModel):
     sender_name: str
     image: Optional[str] = None
     is_private: Optional[bool] = False
+    voice: Optional[str] = None
     # We don't expect 'data' in the initial request to this service
 
 # --- Model for sending data TO the data service ---
@@ -90,6 +92,11 @@ async def new_message(message: NewMessageRequest, background_tasks: BackgroundTa
     """
     logger.info(f"Received new message: ID {message.message_id} from {message.source_name}, chat_id: {message.chat_id}")
 
+    if message.voice:
+        message.text = transcribe_audio(message.voice)
+        print(message.text)
+    
+    
     if not message.is_private and not await is_monitoring(message.chat_id)  :
         logger.info(f"Chat {message.chat_id} is not active. Skipping processing.")
         return {"status": "chat_not_active"}

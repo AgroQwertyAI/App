@@ -7,11 +7,13 @@ requires-python = ">=3.10"
 dependencies = [
     "aiohttp>=3.11.16",
     "fastapi>=0.115.12",
+    "ffmpeg-python>=0.2.0",
     "matplotlib>=3.10.1",
     "openai>=1.72.0",
     "pandas>=2.2.3",
     "poethepoet>=0.33.1",
     "pydantic>=2.11.1",
+    "pydub>=0.25.1",
     "python-dotenv>=1.1.0",
     "requests>=2.32.3",
     "uvicorn>=0.34.0",

@@ -45,6 +45,7 @@ class NewMessageRequest(BaseModel):
     sender_name: str
     image: Optional[str] = None
     is_private: Optional[bool] = False
+    voice: Optional[str] = None
 
 
 class Images(BaseModel):
@@ -80,22 +81,24 @@ class Agent:
     async def process_message(self, message):
         
         if not message.is_private:
-            initial_payload = DataServicePayload(
-                    message_id=message.message_id,
-                    source_name=message.source_name,
-                    chat_id=message.chat_id,
-                    text=message.text,
-                    sender_id=message.sender_id,
-                    sender_name=message.sender_name,
-                    image=message.image,
-                    data=None, # Explicitly None for the first call
-                    is_private=message.is_private
-                )
+            if await is_report(message.text):
+            
+                initial_payload = DataServicePayload(
+                        message_id=message.message_id,
+                        source_name=message.source_name,
+                        chat_id=message.chat_id,
+                        text=message.text,
+                        sender_id=message.sender_id,
+                        sender_name=message.sender_name,
+                        image=message.image,
+                        data=None, # Explicitly None for the first call
+                        is_private=message.is_private
+                    )
+                    
+                await self.send_to_data_service_new_message(initial_payload)
                 
-            await self.send_to_data_service_new_message(initial_payload)
-            
-            
-            await self.process_chat_message(message)
+                
+                await self.process_chat_message(message)
             
             
         else:
@@ -269,7 +272,8 @@ class Agent:
                 
             
             if success:
-
+                
+                
                 # 2. Prepare payload for the update call (including LLM data)
                 update_payload = DataServicePayload(
                     message_id=message.message_id,
@@ -286,9 +290,13 @@ class Agent:
                 # 3. Send the update to the data service
                 data_service_success = await self.send_to_data_service_new_message(update_payload)
                 
-                # 4. Send the processed data to the save service
-                save_service_success = await self.send_to_save_service(message, parsed_rows)
+                try:
+                    # 4. Send the processed data to the save service
+                    save_service_success = await self.send_to_save_service(message, parsed_rows)
 
+                except e:
+                    logger.error(f"Error sending data to Save Service.")
+                
                 if data_service_success:
                     logger.info(f"[Background Task] Successfully sent LLM update to Data Service for message {message.message_id}")
                 else:

@@ -31,7 +31,7 @@ async def chat(
     kwargs = {
         "model": model,
         "messages": messages,
-        "max_tokens": 8192
+        "max_tokens": 3000
     }
     
     extra_body = {}
@@ -42,9 +42,10 @@ async def chat(
     if tools:
         kwargs["tools"] = tools
     
+    extra_body["reasoning_options_mode"] = "ENABLED_HIDDEN"
+    
     try:
         response = await client.chat.completions.create(**kwargs, extra_body=extra_body)
-        
         return response
     except Exception as e:
         print(f"Error calling LLM API: {e}")
