@@ -9,6 +9,8 @@ from src.generating_reports.systems.yandex_disk import get_yandex_disk_config, g
 import yadisk
 import io
 from src.auxiliary.logging import log_info
+import httpx
+import asyncio
 
 def get_message_number(sender_name: str, setting_id: int) -> int:
     """
@@ -33,7 +35,7 @@ def get_message_number(sender_name: str, setting_id: int) -> int:
         # Add 1 to get the new message number
         return count + 1
 
-def update_google_drive(message: MessagePendingPost, setting_id: int, conn: Connection):
+async def update_google_drive(message: MessagePendingPost, setting_id: int, conn: Connection):
     # Use Moscow time zone (UTC+3)
     moscow_tz = timezone(timedelta(hours=3))
     now = datetime.now(moscow_tz)
@@ -73,33 +75,59 @@ def update_google_drive(message: MessagePendingPost, setting_id: int, conn: Conn
     for excel_file in excel_items:
         service.files().delete(fileId=excel_file['id']).execute()
     
-    # Upload the file to the qwerty folder
-    upload_file(
-        service,
-        text,
-        file_name,
-        qwerty_folder_id,
-        'text/plain'
-    ).execute()
+    # Upload files asynchronously
+    async with httpx.AsyncClient() as client:
+        requests = []
+        
+        # Text file upload request
+        requests.append(client.post(
+            "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart",
+            headers={
+                "Authorization": f"Bearer {service._http.credentials.token}",
+                "Content-Type": "multipart/related; boundary=boundary",
+            },
+            content=(
+                "--boundary\r\n"
+                "Content-Type: application/json\r\n\r\n"
+                f'{{"name": "{file_name}", "parents": ["{qwerty_folder_id}"], "mimeType": "text/plain"}}\r\n'
+                "--boundary\r\n"
+                "Content-Type: text/plain\r\n\r\n"
+                f"{text}\r\n"
+                "--boundary--"
+            ),
+        ))
 
-    pending_messages = get_pending_messages(setting_id, conn)
-    agreggated_data = aggregate_messages(pending_messages)
+        pending_messages = get_pending_messages(setting_id, conn)
+        agreggated_data = aggregate_messages(pending_messages)
 
-    df = pd.DataFrame(agreggated_data)
-    xlsx_bytes = convert_dataframe_to_bytes_xlsx(df)
+        df = pd.DataFrame(agreggated_data)
+        xlsx_bytes = convert_dataframe_to_bytes_xlsx(df)
 
-    formatted_date_xlsx = now.strftime("%H%d%m%Y")
-    xlsx_file_name = f"{formatted_date_xlsx}_qwerty.xlsx"
+        formatted_date_xlsx = now.strftime("%H%d%m%Y")
+        xlsx_file_name = f"{formatted_date_xlsx}_qwerty.xlsx"
 
-    upload_file(
-        service,
-        xlsx_bytes,
-        xlsx_file_name,
-        qwerty_folder_id,
-        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-    ).execute()
+        # Excel file upload request
+        requests.append(client.post(
+            "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart",
+            headers={
+                "Authorization": f"Bearer {service._http.credentials.token}",
+                "Content-Type": "multipart/related; boundary=boundary",
+            },
+            content=(
+                "--boundary\r\n"
+                "Content-Type: application/json\r\n\r\n"
+                f'{{"name": "{xlsx_file_name}", "parents": ["{qwerty_folder_id}"], "mimeType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}}\r\n'
+                "--boundary\r\n"
+                "Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet\r\n\r\n"
+                f"{xlsx_bytes}\r\n"
+                "--boundary--"
+            ),
+        ))
+        
+        # Wait for all uploads to complete
+        await asyncio.gather(*requests)
 
-def update_yandex_disk(message: MessagePendingPost, setting_id: int, conn: Connection):
+async def update_yandex_disk(message: MessagePendingPost, setting_id: int, conn: Connection):
     # Use Moscow time zone (UTC+3)
     moscow_tz = timezone(timedelta(hours=3))
     now = datetime.now(moscow_tz)
@@ -115,8 +143,8 @@ def update_yandex_disk(message: MessagePendingPost, setting_id: int, conn: Conne
     if not yandex_config or not yandex_config.get("token"):
         raise Exception("Cannot access Yandex Disk token")
     
-    # Initialize Yandex Disk client
-    y = yadisk.YaDisk(token=yandex_config["token"])
+    # Initialize Yandex Disk async client
+    y = yadisk.AsyncClient(token=yandex_config["token"])
     
     # Get shared folder name from config
     shared_folder_name = get_yandex_disk_folder_path()
@@ -124,17 +152,26 @@ def update_yandex_disk(message: MessagePendingPost, setting_id: int, conn: Conne
     
     # Check if 'qwerty' folder exists, create if not
     qwerty_path = f"{base_path}/qwerty"
-    if not y.exists(qwerty_path):
-        y.mkdir(qwerty_path)
+    
+    # Use synchronous client for checking existence
+    sync_y = yadisk.YaDisk(token=yandex_config["token"])
+    if not sync_y.exists(qwerty_path):
+        await y.mkdir(qwerty_path)
     
     # Check for existing Excel files in the qwerty folder and delete them
-    for item in y.listdir(qwerty_path):
+    requests = []
+    for item in sync_y.listdir(qwerty_path):
         if item["mime_type"] == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet":
-            y.remove(item["path"])
+            requests.append(y.remove(item["path"]))
+    
+    if requests:
+        await asyncio.gather(*requests)
+    
+    requests = []
     
     # Upload the text file to Yandex Disk
     text_buffer = io.BytesIO(text.encode('utf-8'))
-    y.upload(text_buffer, f"{qwerty_path}/{file_name}")
+    requests.append(y.upload(text_buffer, f"{qwerty_path}/{file_name}"))
 
     # Get pending messages and create Excel report
     pending_messages = get_pending_messages(setting_id, conn)
@@ -148,4 +185,7 @@ def update_yandex_disk(message: MessagePendingPost, setting_id: int, conn: Conne
 
     # Upload Excel file to Yandex Disk
     xlsx_buffer = io.BytesIO(xlsx_bytes)
-    y.upload(xlsx_buffer, f"{qwerty_path}/{xlsx_file_name}")
+    requests.append(y.upload(xlsx_buffer, f"{qwerty_path}/{xlsx_file_name}"))
+    
+    # Wait for all uploads to complete
+    await asyncio.gather(*requests)

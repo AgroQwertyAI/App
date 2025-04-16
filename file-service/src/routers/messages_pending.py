@@ -131,9 +131,9 @@ async def create_message(
         testing = message.extra.get("testing", False)
         if testing:
             if setting_type == "google-drive":
-                update_google_drive(message, setting_id, conn)
+                await update_google_drive(message, setting_id, conn)
             elif setting_type == "yandex-disk":
-                update_yandex_disk(message, setting_id, conn)
+                await update_yandex_disk(message, setting_id, conn)
         
         # Return the created message
         return MessagePendingGet(
