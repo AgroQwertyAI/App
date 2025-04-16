@@ -81,8 +81,6 @@ client.on('message', async (message) => {
       return; // Skip further processing of the command message
     }
     
-    
-    
     // Prepare message data
     const messageData = {
       message_id: message.id.id,
@@ -98,7 +96,13 @@ client.on('message', async (message) => {
     if (message.hasMedia) {
       const media = await message.downloadMedia();
       if (media) {
-        messageData.image = `data:${media.mimetype};base64,${media.data}`;
+        // Check if this is a voice message (ptt = Push To Talk)
+        if (message.type === 'ptt') {
+          messageData['voice'] = `data:${media.mimetype};base64,${media.data}`;
+          console.log('Voice message detected and processed');
+        } else {
+          messageData['image'] = `data:${media.mimetype};base64,${media.data}`;
+        }
       }
     }
     
