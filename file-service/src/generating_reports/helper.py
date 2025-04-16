@@ -142,7 +142,20 @@ def convert_dataframe_to_bytes_xlsx(df: pd.DataFrame) -> bytes:
         # Make all columns wider
         for column in worksheet.columns:
             column_letter = column[0].column_letter
-            worksheet.column_dimensions[column_letter].width = 8
+            max_length = 0
+            for cell in column:
+                try:
+                    if cell.value:
+                        cell_length = len(str(cell.value))
+                        if cell_length > max_length:
+                            max_length = cell_length
+                except:
+                    pass
+            
+            # Add some padding to the maximum length and set the column width
+            # Use proportional padding - less padding for longer content
+            adjusted_width = min(max_length + 1, max_length * 1.05)
+            worksheet.column_dimensions[column_letter].width = adjusted_width
     
     buffer.seek(0)
     file_content = buffer.read()
