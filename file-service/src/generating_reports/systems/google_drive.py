@@ -2,6 +2,7 @@ from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseUpload, MediaInMemoryUpload, HttpRequest
 from google.oauth2 import service_account
 from datetime import datetime
+from fastapi import HTTPException
 import json
 import pandas as pd
 import base64
@@ -31,6 +32,10 @@ CONFIG_FILE_GOOGLE_DRIVE = OAUTH_CONFIG_DIR / "google_drive_credentials.json"
 def get_google_drive_config():
     """Get the Google Drive credentials from the configuration file."""
     try:
+        if not CONFIG_FILE_GOOGLE_DRIVE.exists():
+            log_info("Google Drive credentials file not found", 'error')
+            raise HTTPException(status_code=404, detail="Google Drive credentials file not found")
+        
         with open(CONFIG_FILE_GOOGLE_DRIVE, "r") as f:
             data = json.load(f)
             return data
