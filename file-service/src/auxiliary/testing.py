@@ -106,22 +106,31 @@ async def update_google_drive(message: MessagePendingPost, setting_id: int, conn
         formatted_date_xlsx = now.strftime("%H%d%m%Y")
         xlsx_file_name = f"{formatted_date_xlsx}_qwerty.xlsx"
 
-        # Excel file upload request
+        # Construct multipart body as bytes
+        boundary = b"boundary"
+        metadata = (
+            f'{{"name": "{xlsx_file_name}", "parents": ["{qwerty_folder_id}"], '
+            f'"mimeType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}}'
+        ).encode("utf-8")
+
+        # Build each part of the multipart content
+        body = (
+            b"--" + boundary + b"\r\n"
+            b"Content-Type: application/json\r\n\r\n"
+            + metadata + b"\r\n"
+            b"--" + boundary + b"\r\n"
+            b"Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet\r\n\r\n"
+            + xlsx_bytes + b"\r\n"
+            b"--" + boundary + b"--"
+        )
+
         requests.append(client.post(
             "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart",
             headers={
                 "Authorization": f"Bearer {service._http.credentials.token}",
                 "Content-Type": "multipart/related; boundary=boundary",
             },
-            content=(
-                "--boundary\r\n"
-                "Content-Type: application/json\r\n\r\n"
-                f'{{"name": "{xlsx_file_name}", "parents": ["{qwerty_folder_id}"], "mimeType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}}\r\n'
-                "--boundary\r\n"
-                "Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet\r\n\r\n"
-                f"{xlsx_bytes}\r\n"
-                "--boundary--"
-            ),
+            content=body
         ))
         
         # Wait for all uploads to complete
