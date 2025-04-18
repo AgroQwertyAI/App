@@ -81,6 +81,13 @@ client.on('message', async (message) => {
       return; // Skip further processing of the command message
     }
     
+    // Get current date in Moscow time (UTC+3)
+    const now = new Date();
+    const moscowTime = new Date(now.getTime() + 3 * 60 * 60 * 1000); // Add 3 hours for Moscow time
+    
+    // Format: МинутаЧасДеньМесяцГод
+    const datetime = `${String(moscowTime.getUTCMinutes()).padStart(2, '0')}${String(moscowTime.getUTCHours()).padStart(2, '0')}${String(moscowTime.getUTCDate()).padStart(2, '0')}${String(moscowTime.getUTCMonth() + 1).padStart(2, '0')}${moscowTime.getUTCFullYear()}`;
+    
     // Prepare message data
     const messageData = {
       message_id: message.id.id,
@@ -89,7 +96,8 @@ client.on('message', async (message) => {
       text: message.body,
       sender_id: contact.id._serialized,
       sender_name: contact.name || contact.pushname || contact.number || "Unknown",
-      is_private: isPrivate
+      is_private: isPrivate,
+      datetime: datetime // Add the datetime field
     };
     
     // Handle media if present
