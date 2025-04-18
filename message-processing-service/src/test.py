@@ -3,7 +3,7 @@ import uuid
 import requests
 
 # Configuration
-CSV_PATH = '../prompts.csv'
+CSV_PATH = 'prompts.csv'
 ENDPOINT = 'http://localhost:8001/new_message'
 CHAT_ID = '120363416114039646@g.us'
 SOURCE_NAME = 'whatsapp'
