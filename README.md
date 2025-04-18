@@ -2,7 +2,7 @@
 
 This repository contains a collection of microservices that power the backend of the application.
 
-## 🚀 Project Structure
+# 🚀 Project Structure
 
 The project consists of the following microservices:
 
@@ -18,25 +18,25 @@ The project consists of the following microservices:
 | presentation-service | Data presentation service | 52003 |
 | classification-service | Classification service | 52004 |
 
-## 📋 Requirements
+# 📋 Requirements
 
 - [Docker and Docker Compose](https://docs.docker.com/get-docker/)
 - [Node.js](https://nodejs.org/en/download/)
 - [uv Python package installer](https://github.com/astral-sh/uv)
 
-## 🔧 Installation & Setup
+# 🔧 Installation & Setup
 
-### Running all services with Docker
+## Running backend with Docker
 
-To start project:
+To start the project:
 
 ```bash
 docker compose up
 ```
 
-### Running individual services for development
+## Running individual services for development
 
-#### Python microservices
+### Python microservices
 
 For each Python-based microservice:
 
@@ -47,7 +47,7 @@ For each Python-based microservice:
 uv run poe start
 ```
 
-#### Node.js microservices
+### Node.js microservices
 
 For Node.js-based services:
 
@@ -67,3 +67,9 @@ node whatsapp.js
 ## 🔐 Environment Variables
 
 Environment variables are loaded from the `.env` file in the root directory.
+
+### Required Environment Variables
+
+| Variable | Description |
+|----------|-------------|
+| LLM_SERVICE_URL | URL to the Nexus LLM server ([esoteric-ai/nexus](https://github.com/esoteric-ai/nexus)) |
