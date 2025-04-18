@@ -51,20 +51,9 @@ async def update_google_drive(message: MessagePendingPost, setting_id: int, conn
     service = get_drive_service()
     
     # Find the shared folder
-    base_folder_id = find_shared_folder(service)
-    if not base_folder_id:
+    qwerty_folder_id = find_shared_folder(service)
+    if not qwerty_folder_id:
         raise Exception("Cannot access the shared folder")
-    
-    # Check if 'qwerty' folder exists, create if not
-    query = f"name='qwerty' and mimeType='application/vnd.google-apps.folder' and '{base_folder_id}' in parents and trashed=false"
-    results = service.files().list(q=query, spaces='drive', fields='files(id, name)').execute()
-    items = results.get('files', [])
-    
-    if items:
-        qwerty_folder_id = items[0]['id']
-    else:
-        # Create 'qwerty' folder if it doesn't exist
-        qwerty_folder_id = create_folder(service, 'qwerty', base_folder_id).execute()['id']
     
     # Check for existing Excel files in the qwerty folder and delete them
     excel_query = f"mimeType='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' and '{qwerty_folder_id}' in parents and trashed=false"
