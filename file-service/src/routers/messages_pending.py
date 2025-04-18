@@ -131,6 +131,7 @@ async def create_message(
         # Get the ID of the newly inserted message
         message_id = cursor.lastrowid
 
+    print(message_id)
     testing = message.extra.get("testing", False)
     if testing:
         if setting_type == "google-drive":

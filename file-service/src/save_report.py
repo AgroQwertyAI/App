@@ -38,7 +38,7 @@ async def save_report(setting_id: int):
             log_info(f"Found setting: {setting['setting_name']}", 'info')
 
         if setting['type'] == 'filesystem':
-            file = await save_filesystem_report(setting)
+            file = save_filesystem_report(setting)
 
         if setting['type'] == 'yandex-disk':
             file = await save_yandex_disk_report(setting)

@@ -268,7 +268,6 @@ class Agent:
 
     async def send_to_save_service(self, message: NewMessageRequest, data: List[Dict[str, Any]], setting_id: int = 1):
         url = f"{FILE_SERVICE_URL}/api/setting/{setting_id}/message_pending"
-        print(data)
         try:
             template_id = await get_template_id(message.chat_id)
             template = get_template_by_id(template_id)
