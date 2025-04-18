@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const SERVICE_URL = process.env.SAVE_SERVICE_URL || 'http://localhost:52001/api';
+const SERVICE_URL = process.env.FILE_SERVICE_URL + "/api" || 'http://localhost:52001/api';
 
 type Params = Promise<{ id: string }>;
 

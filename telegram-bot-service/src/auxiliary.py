@@ -37,7 +37,7 @@ async def register_chat(chat_registration: ChatRegistrationSchema) -> None:
 
 async def unregister_chat(chat_id: str) -> None:
     async with aiohttp.ClientSession() as session:
-        async with session.delete(f"{BACKEND_SERVICE_URL}/api/chats/{chat_id}") as resp:
+        async with session.delete(f"{DATA_SERVICE_URL}/api/chats/{chat_id}") as resp:
             if resp.status == 200:
                 log_info(f"Chat unregistered successfully: {chat_id}", 'info')
             else:

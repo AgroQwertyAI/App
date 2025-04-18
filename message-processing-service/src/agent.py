@@ -27,10 +27,10 @@ load_dotenv()
 
 # Environment variables
 API_PORT = int(os.getenv("API_PORT", 8001))
-FILE_SERVICE_URL = os.environ["FILE_SERVICE_URL"]
+DATA_SERVICE_URL = os.environ["DATA_SERVICE_URL"]
 LLM_SERVICE_URL = os.environ["LLM_SERVICE_URL"]
 WHATSAPP_SERVICE_URL = os.getenv("WHATSAPP_SERVICE_URL", "http://localhost:52101")
-SAVE_SERVICE_URL = os.getenv("SAVE_SERVICE_URL", "http://localhost:52001")
+FILE_SERVICE_URL = os.getenv("FILE_SERVICE_URL", "http://localhost:52001")
 
 # Path to store failed attempts
 FAILED_LIST_PATH = "../failed_list.json"
@@ -171,7 +171,7 @@ class Agent:
             return False
 
     async def send_to_data_service_new_message(self, payload: DataServicePayload):
-        url = f"{FILE_SERVICE_URL}/api/chats/new_message"
+        url = f"{DATA_SERVICE_URL}/api/chats/new_message"
         try:
             payload_dict = payload.model_dump(exclude_none=True) if hasattr(payload, 'model_dump') else payload.dict(exclude_none=True)
             log_prefix = "Forwarding initial" if payload.data is None else "Sending LLM update for"
@@ -267,7 +267,7 @@ class Agent:
             return {}
 
     async def send_to_save_service(self, message: NewMessageRequest, data: List[Dict[str, Any]], setting_id: int = 1):
-        url = f"{SAVE_SERVICE_URL}/api/setting/{setting_id}/message_pending"
+        url = f"{FILE_SERVICE_URL}/api/setting/{setting_id}/message_pending"
         try:
             template_id = await get_template_id(message.chat_id)
             template = get_template_by_id(template_id)
