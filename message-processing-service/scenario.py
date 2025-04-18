@@ -6,6 +6,8 @@ from llm import chat
 
 from bert import is_report_bert
 
+from online_log import log
+
 STRAGEGY = "CSV"
 MODEL_NAME = "Mistral"
 
@@ -37,7 +39,7 @@ async def agentic(history: list, message: str):
     
     return {"history": payload, "answer": result}
 
-async def is_report(message: str, use_bert: bool = True) -> bool:
+async def is_report(message: str, use_bert: bool = False) -> bool:
     if use_bert:
         from bert import is_report_bert
         return await is_report_bert(message)
@@ -45,7 +47,7 @@ async def is_report(message: str, use_bert: bool = True) -> bool:
     payload = [
         {
             "role": "system",
-            "content": f"Ты - {MODEL_NAME}, очень точная и интеллектуальная модель классификации агрономических отчётов. Тебе будет дано сообщение из чата и всё что тебе нужно сделать это определить является ли оно агрономическим отчётом. Агрономический отчет - сообщение в свободной форме с информацией о каких-то операциях на полях. Подумай и если это сообщение является отчётом, наипши 'REPORT', если оно не является отчётом, например , 'TALK'."  
+            "content": f"Ты - {MODEL_NAME}, очень точная и интеллектуальная модель классификации агрономических отчётов. Тебе будет дано сообщение из чата и всё что тебе нужно сделать это определить является ли оно агрономическим отчётом. Агрономический отчет - сообщение в свободной форме с информацией о каких-то операциях на полях. Подумай и если это сообщение является отчётом, напиши 'REPORT', если оно не является отчётом, напиши 'TALK'.\nПримеры отчётов:\n1)\nСевер \nОтд7 пах с св 41/501\nОтд20 20/281 по пу 61/793\nОтд 3 пах подс.60/231\nПо пу 231\n\nДиск к. Сил отд 7. 32/352\nПу- 484\nДиск под Оз п езубов 20/281\nДиск под с. Св отд 10 83/203 пу-1065га\n\n2)\nПривет, по отделу 7 прошлись пахотой сах свеклы 41/501.\n\nИ другие. Если сообщение хоть как-то похоже на агрономический отчёт, пиши 'REPORT'."  
         },
         {
             "role": "user",
@@ -53,7 +55,7 @@ async def is_report(message: str, use_bert: bool = True) -> bool:
         }
     ]
     
-    result = await chat("mist", payload)
+    result = await chat("yagpt", payload)
     result = result.choices[0].message.content
     
     return 'REPORT' in result
@@ -111,7 +113,7 @@ async def extract_data_from_message(message: str, template: dict) -> dict:
     print("TASK SPLIT PROMPT", template.get("taskSplitPrompt"))
     
     split = await split_report(message, template.get("taskSplitPrompt"))
-    
+    log(f"Task split result: {split}", level="info", source="split_report")
     
     tasks = [extract_csv(msg, template.get("systemPrompt")) for msg in split]
     result = await asyncio.gather(*tasks)
@@ -203,11 +205,15 @@ async def extract_csv(message: str, prompt = None) -> dict:
     
     if question == "": question = None
     
-    return {
+    result_dict = {
         "data": data,
         "question": question,
         "success": len(data) > 0
     }
+    
+    log(f"Extracted CSV data: {result_dict}", level="info", source="extract_csv")
+    
+    return result_dict
     
     
     

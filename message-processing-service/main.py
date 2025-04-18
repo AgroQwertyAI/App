@@ -22,6 +22,8 @@ load_dotenv()
 app = FastAPI(title="Message Processing Service")
 
 agents = {}
+# Create a semaphore to limit concurrent background tasks
+task_semaphore = asyncio.Semaphore(5)
 
 # Environment variables
 API_PORT = int(os.getenv("API_PORT", 8001))
@@ -40,6 +42,7 @@ class NewMessageRequest(BaseModel):
     image: Optional[str] = None
     is_private: Optional[bool] = False
     voice: Optional[str] = None
+    datetime : Optional[str] = None
     # We don't expect 'data' in the initial request to this service
 
 # --- Model for sending data TO the data service ---
@@ -71,6 +74,17 @@ async def is_monitoring(chat_id: str) -> bool:
     except Exception as e:
         logger.error(f"Error checking monitoring status for chat {chat_id}: {traceback.format_exc()}")
         return True
+
+# --- Semaphore-protected wrapper for background tasks ---
+async def process_with_semaphore(agent, message):
+    """
+    Process a message with semaphore protection to limit concurrent tasks.
+    """
+    async with task_semaphore:
+        logger.info(f"Starting processing for message {message.message_id} (active tasks: {5 - task_semaphore._value})")
+        await agent.process_message(message)
+        logger.info(f"Completed processing message {message.message_id}")
+
 # --- API Endpoints ---
 
 @app.on_event("startup")
@@ -101,12 +115,17 @@ async def new_message(message: NewMessageRequest, background_tasks: BackgroundTa
         logger.info(f"Chat {message.chat_id} is not active. Skipping processing.")
         return {"status": "chat_not_active"}
 
+    # Remove this
+    # if message.is_private:
+    #     return {"status": "chat_not_active"}
+    
     if message.sender_id not in agents:
         logger.info(f"Creating new agent for sender: {message.sender_id}")
         agents[message.sender_id] = Agent(message.sender_id)
     
     agent = agents[message.sender_id]
-    background_tasks.add_task(agent.process_message, message)
+    # Use the semaphore-protected wrapper
+    background_tasks.add_task(process_with_semaphore, agent, message)
     
     return {
         "status": "received_processing_started",
