@@ -110,32 +110,32 @@ def convert_dataframe_to_bytes_xlsx(df: pd.DataFrame) -> bytes:
         # Apply yellow fill to empty cells and format numerical strings
         for row in worksheet.iter_rows(min_row=2):  # Skip header row
             for cell in row:
-                if cell.value is None or cell.value == '':
-                    cell.fill = yellow_fill
-                elif isinstance(cell.value, str):
-                    # Check if the string contains an asterisk
-                    if '*' in cell.value:
-                        # Remove the asterisk
-                        cell.value = cell.value.replace('*', '')
-                        # Apply yellow fill
-                        cell.fill = yellow_fill
-                    
-                    # Check if the string represents an integer or float
+                if isinstance(cell.value, str):
                     cell_value = cell.value.strip()
                     if cell_value.isdigit():
-                        # It's an integer, format with space as thousands separator
-                        cell.number_format = '# ##0'
                         try:
-                            # Convert to number but keep as string in the cell
-                            cell.value = int(cell_value)
+                            num_value = int(cell_value)
+                            # Check if number is in millions range
+                            if num_value >= 1000000:
+                                # Format for millions: maintain thousands separators without suffix
+                                cell.number_format = '# ### ### ##0'
+                            else:
+                                # Regular integer format with space as thousands separator
+                                cell.number_format = '# ##0'
+                            cell.value = num_value
                         except ValueError:
                             pass
                     elif is_float_string(cell_value):
-                        # It's a float, format with space as thousands separator and decimal places
-                        cell.number_format = '# ##0.00'
                         try:
-                            # Convert to number but keep as string in the cell
-                            cell.value = float(cell_value)
+                            num_value = float(cell_value)
+                            # Check if float is in millions range
+                            if num_value >= 1000000:
+                                # Format for millions: maintain thousands separators without suffix
+                                cell.number_format = '# ### ### ##0.00'
+                            else:
+                                # Regular float format with space as thousands separator
+                                cell.number_format = '# ##0.00'
+                            cell.value = num_value
                         except ValueError:
                             pass
         

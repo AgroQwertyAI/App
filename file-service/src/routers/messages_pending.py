@@ -92,19 +92,22 @@ async def create_message(
         # Check if setting exists
         cursor.execute("SELECT setting_id, type FROM settings WHERE setting_id = ?", (setting_id,))
         setting = cursor.fetchone()
-        if not setting:
-            raise HTTPException(status_code=404, detail="Setting not found")
+
+    if not setting:
+        raise HTTPException(status_code=404, detail="Setting not found")
+    
+    setting_type = setting[1]
+    
+    # Insert the new message
+    current_time = datetime.now(timezone.utc).isoformat()
+    
+    # Convert images to a serializable format if it's an object
+    images_data = message.images
+    if hasattr(images_data, "__dict__"):
+        images_data = images_data.__dict__
         
-        setting_type = setting[1]
-        
-        # Insert the new message
-        current_time = datetime.now(timezone.utc).isoformat()
-        
-        # Convert images to a serializable format if it's an object
-        images_data = message.images
-        if hasattr(images_data, "__dict__"):
-            images_data = images_data.__dict__
-        
+    with get_session() as conn:
+        cursor = conn.cursor()
         cursor.execute(
             """
             INSERT INTO messages_pending 
@@ -128,26 +131,26 @@ async def create_message(
         # Get the ID of the newly inserted message
         message_id = cursor.lastrowid
 
-        testing = message.extra.get("testing", False)
-        if testing:
-            if setting_type == "google-drive":
-                await update_google_drive(message, setting_id, conn)
-            elif setting_type == "yandex-disk":
-                await update_yandex_disk(message, setting_id, conn)
-        
-        # Return the created message
-        return MessagePendingGet(
-            message_id=message_id,
-            sender_phone_number=message.sender_phone_number,
-            sender_name=message.sender_name,
-            sender_id=message.sender_id,
-            setting_id=setting_id,
-            original_message_text=message.original_message_text,
-            formatted_message_text=message.formatted_message_text,
-            images=message.images,
-            timedata=current_time,
-            extra=message.extra
-        )
+    testing = message.extra.get("testing", False)
+    if testing:
+        if setting_type == "google-drive":
+            await update_google_drive(message, setting_id)
+        elif setting_type == "yandex-disk":
+            await update_yandex_disk(message, setting_id)
+    
+    # Return the created message
+    return MessagePendingGet(
+        message_id=message_id,
+        sender_phone_number=message.sender_phone_number,
+        sender_name=message.sender_name,
+        sender_id=message.sender_id,
+        setting_id=setting_id,
+        original_message_text=message.original_message_text,
+        formatted_message_text=message.formatted_message_text,
+        images=message.images,
+        timedata=current_time,
+        extra=message.extra
+    )
 
 
 @message_pending_router.put(
