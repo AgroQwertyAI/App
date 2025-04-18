@@ -8,8 +8,6 @@ from src.generating_reports.systems.yandex_disk import get_yandex_disk_config, g
 import yadisk
 import io
 import httpx
-import asyncio
-from src.auxiliary.locks import excel_file_lock
 
 def get_message_number(sender_id: str, setting_id: int) -> int:
     """
@@ -33,7 +31,7 @@ def get_message_number(sender_id: str, setting_id: int) -> int:
         
         return count 
 
-async def update_google_drive(message: MessagePendingPost, setting_id: int):
+def update_google_drive(message: MessagePendingPost, setting_id: int):
     # Use Moscow time zone (UTC+3)
     moscow_tz = timezone(timedelta(hours=3))
     now = datetime.now(moscow_tz)
@@ -68,65 +66,60 @@ async def update_google_drive(message: MessagePendingPost, setting_id: int):
     excel_results = service.files().list(q=excel_query, spaces='drive', fields='files(id, name)').execute()
     excel_items = excel_results.get('files', [])
     
-    async with excel_file_lock:
-        # Delete any existing Excel files
-        async with httpx.AsyncClient() as client:
-            requests = []
-            for excel_file in excel_items:
-                requests.append(client.delete(
-                    f"https://www.googleapis.com/drive/v3/files/{excel_file['id']}",
-                    headers={"Authorization": f"Bearer {service._http.credentials.token}"}
-                ))
-            
-            # Text file upload request
-            requests.append(client.post(
-                "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart",
-                headers={
-                    "Authorization": f"Bearer {service._http.credentials.token}",
-                    "Content-Type": "multipart/related; boundary=boundary",
-                },
-                content=(
-                    "--boundary\r\n"
-                    "Content-Type: application/json\r\n\r\n"
-                    f'{{"name": "{file_name}", "parents": ["{qwerty_folder_id}"], "mimeType": "text/plain"}}\r\n'
-                    "--boundary\r\n"
-                    "Content-Type: text/plain\r\n\r\n"
-                    f"{text}\r\n"
-                    "--boundary--"
-                ),
-            ))
-
-            # Construct multipart body as bytes
-            boundary = b"boundary"
-            metadata = (
-                f'{{"name": "{xlsx_file_name}", "parents": ["{qwerty_folder_id}"], '
-                f'"mimeType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}}'
-            ).encode("utf-8")
-
-            # Build each part of the multipart content
-            body = (
-                b"--" + boundary + b"\r\n"
-                b"Content-Type: application/json\r\n\r\n"
-                + metadata + b"\r\n"
-                b"--" + boundary + b"\r\n"
-                b"Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet\r\n\r\n"
-                + xlsx_bytes + b"\r\n"
-                b"--" + boundary + b"--"
+    with httpx.Client() as client:
+        for excel_file in excel_items:
+            client.delete(
+                f"https://www.googleapis.com/drive/v3/files/{excel_file['id']}",
+                headers={"Authorization": f"Bearer {service._http.credentials.token}"}
             )
+        
+        # Text file upload request
+        client.post(
+            "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart",
+            headers={
+                "Authorization": f"Bearer {service._http.credentials.token}",
+                "Content-Type": "multipart/related; boundary=boundary",
+            },
+            content=(
+                "--boundary\r\n"
+                "Content-Type: application/json\r\n\r\n"
+                f'{{"name": "{file_name}", "parents": ["{qwerty_folder_id}"], "mimeType": "text/plain"}}\r\n'
+                "--boundary\r\n"
+                "Content-Type: text/plain\r\n\r\n"
+                f"{text}\r\n"
+                "--boundary--"
+            ),
+        )
 
-            requests.append(client.post(
-                "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart",
-                headers={
-                    "Authorization": f"Bearer {service._http.credentials.token}",
-                    "Content-Type": "multipart/related; boundary=boundary",
-                },
-                content=body
-            ))
-            
-            # Wait for all uploads to complete
-            await asyncio.gather(*requests)
+        # Construct multipart body as bytes
+        boundary = b"boundary"
+        metadata = (
+            f'{{"name": "{xlsx_file_name}", "parents": ["{qwerty_folder_id}"], '
+            f'"mimeType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}}'
+        ).encode("utf-8")
 
-async def update_yandex_disk(message: MessagePendingPost, setting_id: int):
+        # Build each part of the multipart content
+        body = (
+            b"--" + boundary + b"\r\n"
+            b"Content-Type: application/json\r\n\r\n"
+            + metadata + b"\r\n"
+            b"--" + boundary + b"\r\n"
+            b"Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet\r\n\r\n"
+            + xlsx_bytes + b"\r\n"
+            b"--" + boundary + b"--"
+        )
+
+        client.post(
+            "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart",
+            headers={
+                "Authorization": f"Bearer {service._http.credentials.token}",
+                "Content-Type": "multipart/related; boundary=boundary",
+            },
+            content=body
+        )
+
+
+def update_yandex_disk(message: MessagePendingPost, setting_id: int):
     # Use Moscow time zone (UTC+3)
     moscow_tz = timezone(timedelta(hours=3))
     now = datetime.now(moscow_tz)
@@ -141,9 +134,6 @@ async def update_yandex_disk(message: MessagePendingPost, setting_id: int):
     if not yandex_config or not yandex_config.get("token"):
         raise Exception("Cannot access Yandex Disk token")
     
-    # Initialize Yandex Disk async client
-    y = yadisk.AsyncClient(token=yandex_config["token"])
-    
     # Get shared folder name from config
     shared_folder_name = get_yandex_disk_folder_path()
     base_path = f"/{shared_folder_name}"
@@ -154,39 +144,29 @@ async def update_yandex_disk(message: MessagePendingPost, setting_id: int):
     # Use synchronous client for checking existence
     sync_y = yadisk.YaDisk(token=yandex_config["token"])
     if not sync_y.exists(qwerty_path):
-        await y.mkdir(qwerty_path)
+        sync_y.mkdir(qwerty_path)
     
-    async with excel_file_lock:
-        # Check for existing Excel files in the qwerty folder and delete them
-        requests = []
-        for item in sync_y.listdir(qwerty_path):
-            if item["mime_type"] == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet":
-                requests.append(y.remove(item["path"]))
-        
-        if requests:
-            await asyncio.gather(*requests)
-        
-        requests = []
-        
-        # Upload the text file to Yandex Disk
-        text_buffer = io.BytesIO(text.encode('utf-8'))
-        requests.append(y.upload(text_buffer, f"{qwerty_path}/{file_name}"))
+    for item in sync_y.listdir(qwerty_path):
+        if item["mime_type"] == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet":
+            sync_y.remove(item["path"])
+    
+    
+    # Upload the text file to Yandex Disk
+    text_buffer = io.BytesIO(text.encode('utf-8'))
+    sync_y.upload(text_buffer, f"{qwerty_path}/{file_name}")
 
-        # Get pending messages and create Excel report
-        with get_session() as conn:
-            pending_messages = get_pending_messages(setting_id, conn)
-            
-        agreggated_data = aggregate_messages(pending_messages)
-
-        df = pd.DataFrame(agreggated_data)
-        xlsx_bytes = convert_dataframe_to_bytes_xlsx(df)
-
-        formatted_date_xlsx = now.strftime("%H%d%m%Y")
-        xlsx_file_name = f"{formatted_date_xlsx}_qwerty.xlsx"
-
-        # Upload Excel file to Yandex Disk
-        xlsx_buffer = io.BytesIO(xlsx_bytes)
-        requests.append(y.upload(xlsx_buffer, f"{qwerty_path}/{xlsx_file_name}"))
+    # Get pending messages and create Excel report
+    with get_session() as conn:
+        pending_messages = get_pending_messages(setting_id, conn)
         
-        # Wait for all uploads to complete
-        await asyncio.gather(*requests)
+    agreggated_data = aggregate_messages(pending_messages)
+
+    df = pd.DataFrame(agreggated_data)
+    xlsx_bytes = convert_dataframe_to_bytes_xlsx(df)
+
+    formatted_date_xlsx = now.strftime("%H%d%m%Y")
+    xlsx_file_name = f"{formatted_date_xlsx}_qwerty.xlsx"
+
+    # Upload Excel file to Yandex Disk
+    xlsx_buffer = io.BytesIO(xlsx_bytes)
+    sync_y.upload(xlsx_buffer, f"{qwerty_path}/{xlsx_file_name}")
