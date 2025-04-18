@@ -2,12 +2,6 @@ FROM python:3.12
 
 RUN apt-get update && apt-get install -y build-essential cmake git wget ffmpeg
 
-RUN git clone https://github.com/ggml-org/whisper.cpp.git
-WORKDIR /whisper.cpp
-RUN cmake -B build
-RUN cmake --build build --config Release
-RUN sh ./models/download-ggml-model.sh tiny
-
 WORKDIR /app
 
 # Copy dependency files

@@ -4,7 +4,7 @@ import requests
 from typing import Optional
 
 # Default to localhost:3000 if not specified
-FILE_SERVICE_URL = os.environ.get('FILE_SERVICE_URL', 'http://localhost:3000')
+DATA_SERVICE_URL = os.environ.get('DATA_SERVICE_URL', 'http://localhost:3000')
 
 def log(message: str, level: Optional[str] = 'info', source: Optional[str] = 'app') -> dict:
     """
@@ -24,7 +24,7 @@ def log(message: str, level: Optional[str] = 'info', source: Optional[str] = 'ap
     if not message:
         raise ValueError("Message cannot be empty")
         
-    url = f"{FILE_SERVICE_URL}/api/logs/submit"
+    url = f"{DATA_SERVICE_URL}/api/logs/submit"
     
     payload = {
         "message": message,

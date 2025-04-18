@@ -6,12 +6,12 @@ const express = require('express');
 require('dotenv').config();
 
 // Environment variables
-const DATA_SERVICE_URI = process.env.DATA_SERVICE_URI;
-const MESSAGE_PROCESSING_URI = process.env.MESSAGE_PROCESSING_URI;
+const DATA_SERVICE_URL = process.env.DATA_SERVICE_URL;
+const MESSAGE_PROCESSING_SERVICE_URL = process.env.MESSAGE_PROCESSING_SERVICE_URL;
 const PORT = process.env.PORT || 52101;
 
-if (!DATA_SERVICE_URI || !MESSAGE_PROCESSING_URI) {
-  console.error('Environment variables DATA_SERVICE_URI and MESSAGE_PROCESSING_URI must be set');
+if (!DATA_SERVICE_URL || !MESSAGE_PROCESSING_SERVICE_URL) {
+  console.error('Environment variables DATA_SERVICE_URL and MESSAGE_PROCESSING_SERVICE_URL must be set');
   process.exit(1);
 }
 
@@ -38,7 +38,7 @@ client.on('qr', async (qr) => {
   
   // Send QR code to data service
   try {
-    await axios.post(`${DATA_SERVICE_URI}/api/settings/whatsapp_qr`, { qr_code: qr });
+    await axios.post(`${DATA_SERVICE_URL}/api/settings/whatsapp_qr`, { qr_code: qr });
     console.log('QR code sent to data service');
   } catch (error) {
     console.error('Failed to send QR code to data service:', error.message);
@@ -115,7 +115,7 @@ client.on('message', async (message) => {
     }
     
     // Send to message processing service
-    await axios.post(`${MESSAGE_PROCESSING_URI}/new_message`, messageData);
+    await axios.post(`${MESSAGE_PROCESSING_SERVICE_URL}/new_message`, messageData);
     console.log(`${isPrivate ? 'Private message' : 'Group message'} from ${messageData.sender_name} forwarded to processing service`);
     
   } catch (error) {
@@ -145,7 +145,7 @@ async function registerChat(chat) {
   try {
     const chatId = chat.id._serialized;
     
-    const response = await axios.post(`${DATA_SERVICE_URI}/api/chats`, {
+    const response = await axios.post(`${DATA_SERVICE_URL}/api/chats`, {
       chat_id: chatId,
       chat_name: chat.name || "Unknown Group",
       source_name: "whatsapp"
