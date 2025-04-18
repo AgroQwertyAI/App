@@ -1,16 +1,15 @@
 import os
-import json
 import logging
 import asyncio
 import aiohttp
-from fastapi import FastAPI, HTTPException, BackgroundTasks
-from pydantic import BaseModel, Field
-from typing import Dict, Any, Optional
+from fastapi import FastAPI, BackgroundTasks
+from pydantic import BaseModel
+from typing import Optional
 from dotenv import load_dotenv
 import traceback # For logging
 
-from whisper import transcribe_audio
-from agent import Agent
+from src.whisper import transcribe_audio
+from src.agent import Agent
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')

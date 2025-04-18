@@ -6,18 +6,18 @@ from typing import Dict, Any, Optional, List
 from dotenv import load_dotenv
 import aiohttp
 import traceback  # For logging
-from settings import get_template_by_id, get_template_id
+from src.settings import get_template_by_id, get_template_id
 
-from data_lists import CULTURES, DIVISIONS, OPERATIONS
+from src.data_lists import CULTURES, DIVISIONS, OPERATIONS
 
-from scenario import (
+from src.scenario import (
     extract_data_from_message,
     is_report,
     agentic,
     get_history_for_followup,
     determine_questions,
 )
-from util import dict_to_csv_string, generate_table_image, extract_questions, parse_table_from_message
+from src.util import dict_to_csv_string, generate_table_image, extract_questions, parse_table_from_message
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -33,7 +33,7 @@ WHATSAPP_SERVICE_URL = os.getenv("WHATSAPP_SERVICE_URL", "http://localhost:52101
 SAVE_SERVICE_URL = os.getenv("SAVE_SERVICE_URL", "http://localhost:52001")
 
 # Path to store failed attempts
-FAILED_LIST_PATH = "failed_list.json"
+FAILED_LIST_PATH = "../failed_list.json"
 
 class DataServicePayload(BaseModel):
     message_id: str

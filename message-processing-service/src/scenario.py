@@ -2,11 +2,11 @@ import asyncio
 
 import json
 
-from llm import chat
+from src.llm import chat
 
-from bert import is_report_bert
+from src.bert import is_report_bert
 
-from online_log import log
+from src.online_log import log
 
 STRAGEGY = "CSV"
 MODEL_NAME = "Mistral"
@@ -155,7 +155,7 @@ async def get_history_for_followup(table: str, assistant_message: str) -> dict:
     return payload
 
 async def extract_csv(message: str, prompt = None) -> dict:
-    inst = open('prompt.txt', encoding='utf-8').read()  
+    inst = open('../prompt.txt', encoding='utf-8').read()
     
     if prompt:
         inst = prompt
