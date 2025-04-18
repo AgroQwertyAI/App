@@ -13,7 +13,7 @@ RUN npm install
 COPY . .
 
 # Create .env.local file with MongoDB URI
-RUN echo "MONGODB_URI=mongodb://localhost:27017/adminpanel" > .env.local
+RUN echo "MONGODB_URL=mongodb://admin:admin@mongo-service:27017" > .env.local
 
 # Build the Next.js app
 RUN npm run build

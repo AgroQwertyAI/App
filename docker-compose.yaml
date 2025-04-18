@@ -93,6 +93,8 @@ services:
       dockerfile: Dockerfile
     ports:
       - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
     networks:
       - app-network
 
@@ -128,3 +130,4 @@ volumes:
   file_service_cron_config:
   file_service_database:
   file_service_config:
+  mongodb_data:
