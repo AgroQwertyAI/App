@@ -1,0 +1,1362 @@
+openapi: 3.0.3
+info:
+  title: Next.js API Endpoints
+  description: API documentation for the Next.js application covering chats, logs, settings, users, and services.
+  version: 1.0.0
+servers:
+  - url: /api
+    description: Development server (relative path)
+
+tags:
+  - name: Auth
+    description: Authentication endpoints (NextAuth.js)
+  - name: Chats
+    description: Operations related to chats and messages
+  - name: Logs
+    description: Operations related to application logging
+  - name: Services
+    description: External service integrations
+  - name: Settings
+    description: Application settings management
+  - name: Users
+    description: User management and authentication
+
+paths:
+  /auth/{...}:
+    get:
+      tags:
+        - Auth
+      summary: NextAuth.js GET Handler
+      description: Handles various NextAuth.js GET requests (e.g., signin page, session retrieval, providers). The exact behavior depends on the NextAuth configuration and the path segments provided.
+      parameters:
+        - name: ...
+          in: path
+          required: true
+          description: Dynamic path segments handled by NextAuth.js.
+          schema:
+            type: array
+            items:
+              type: string
+      responses:
+        '200':
+          description: Success (e.g., HTML page, JSON data). Content type varies.
+        '401':
+          description: Unauthorized.
+        '500':
+          description: Internal Server Error.
+    post:
+      tags:
+        - Auth
+      summary: NextAuth.js POST Handler
+      description: Handles various NextAuth.js POST requests (e.g., signin credentials, signout, callbacks). The exact behavior depends on the NextAuth configuration and the path segments provided.
+      parameters:
+        - name: ...
+          in: path
+          required: true
+          description: Dynamic path segments handled by NextAuth.js.
+          schema:
+            type: array
+            items:
+              type: string
+      requestBody:
+        description: Varies depending on the NextAuth action (e.g., credentials, form data).
+        content:
+          application/json: {}
+          application/x-www-form-urlencoded: {}
+      responses:
+        '200':
+          description: Success (e.g., redirect, JSON data). Content type varies.
+        '302':
+          description: Redirect after successful action (e.g., signin, signout).
+        '400':
+          description: Bad Request (e.g., invalid credentials format).
+        '401':
+          description: Unauthorized (e.g., invalid credentials).
+        '500':
+          description: Internal Server Error.
+
+  /chats:
+    get:
+      tags:
+        - Chats
+      summary: Get Chats by Data Source
+      description: Retrieves a list of chat summaries for a specific data source.
+      parameters:
+        - name: source_name
+          in: query
+          required: true
+          description: The name of the data source (e.g., 'whatsapp', 'telegram').
+          schema:
+            type: string
+      responses:
+        '200':
+          description: A list of chats for the specified source.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  chats:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ChatSummary'
+        '400':
+          description: Missing required 'source_name' parameter.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Failed to fetch chats.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    post:
+      tags:
+        - Chats
+      summary: Create New Chat
+      description: Creates a new chat record associated with a data source.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChatCreate'
+      responses:
+        '200': # Note: Code returns 200 on success, though 201 Created might be more conventional
+          description: Chat created successfully.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  chat_id:
+                    type: string
+                    example: "chat123"
+                  insertedId:
+                    type: string
+                    description: The MongoDB ObjectId of the inserted document.
+                    example: "60d..."
+        '400':
+          description: Missing required fields (chat_id, chat_name, source_name).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Chat with this ID and source already exists.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Failed to create chat.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /chats/datasources:
+    get:
+      tags:
+        - Chats
+      summary: Get Available Data Sources
+      description: Retrieves a hardcoded list of available data sources.
+      responses:
+        '200':
+          description: A list of available data source names.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  datasources:
+                    type: array
+                    items:
+                      type: string
+                    example: ["whatsapp", "telegram"]
+
+  /chats/messages/{chat_id}:
+    get:
+      tags:
+        - Chats
+      summary: Get Messages for a Chat
+      description: Retrieves all messages for a specific chat ID, sorted by timestamp.
+      parameters:
+        - name: chat_id
+          in: path
+          required: true
+          description: The unique identifier of the chat.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: An array of messages for the chat.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Message'
+        '500':
+          description: Failed to fetch messages.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /chats/new_message:
+    post:
+      tags:
+        - Chats
+      summary: Submit or Update a Message
+      description: Receives a new message, stores it in the database (upsert based on message_id), and broadcasts it via SSE.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewMessage'
+      responses:
+        '200': # Note: Code returns 200, not 201
+          description: Message processed successfully (created or updated).
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message_id:
+                    type: string
+                    example: "msg_abc123"
+                  operation:
+                    type: string
+                    enum: [created, updated]
+                    example: "created"
+        '400':
+          description: Missing required fields.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Failed to process new message.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /chats/stream_messages:
+    get:
+      tags:
+        - Chats
+      summary: Stream New Messages (SSE)
+      description: Establishes a Server-Sent Events (SSE) connection to stream new messages and heartbeats in real-time.
+      responses:
+        '200':
+          description: SSE connection established. Events are streamed.
+          content:
+            text/event-stream:
+              schema:
+                type: string
+                description: |
+                  Stream of Server-Sent Events.
+                  Events include:
+                  - `connection_established`: Sent on initial connection.
+                    ```json
+                    {
+                      "type": "connection_established",
+                      "clientId": 0,
+                      "timestamp": "2023-10-27T10:00:00.000Z"
+                    }
+                    ```
+                  - `heartbeat`: Sent periodically (e.g., every 30s).
+                    ```json
+                    {
+                      "type": "heartbeat",
+                      "timestamp": "2023-10-27T10:00:30.000Z"
+                    }
+                    ```
+                  - Message Object: Sent when a new message is processed via `/chats/new_message`. The structure matches the `Message` schema.
+                    ```json
+                    {
+                      "message_id": "msg_abc123",
+                      "source_name": "whatsapp",
+                      "chat_id": "chat123",
+                      "text": "Hello there!",
+                      "sender_id": "user456",
+                      "sender_name": "Alice",
+                      "image": null,
+                      "data": null,
+                      "timestamp": "2023-10-27T10:01:00.000Z",
+                      "updated_at": "2023-10-27T10:01:00.000Z"
+                      // _id is usually not included in broadcast
+                    }
+                    ```
+        '500':
+          description: Server error establishing SSE stream.
+
+  /chats/{id}:
+    patch:
+      tags:
+        - Chats
+      summary: Update Chat Active Status
+      description: Updates the active status of a specific chat identified by its chat_id and source_name.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: The chat_id of the chat to update.
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChatUpdate'
+      responses:
+        '200':
+          description: Chat updated successfully.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  updated:
+                    type: boolean
+                    description: True if the document was modified, false otherwise.
+                    example: true
+        '400':
+          description: Missing required fields (source_name, active) or invalid 'active' type.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Chat not found for the given chat_id and source_name.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Failed to update chat.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /logs:
+    get:
+      tags:
+        - Logs
+      summary: Get Recent Logs
+      description: Retrieves the 100 most recent log entries, sorted by timestamp descending.
+      responses:
+        '200':
+          description: A list of recent log entries.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/LogEntry'
+        '500':
+          description: Failed to fetch logs.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /logs/stream:
+    get:
+      tags:
+        - Logs
+      summary: Stream New Logs (SSE)
+      description: Establishes a Server-Sent Events (SSE) connection to stream new log entries in real-time.
+      responses:
+        '200':
+          description: SSE connection established. Events are streamed.
+          content:
+            text/event-stream:
+              schema:
+                type: string
+                description: |
+                  Stream of Server-Sent Events.
+                  Events include:
+                  - Initial connection message: `data: {"connected":true}\n\n`
+                  - Keep-alive comment: `: keepalive\n\n` (sent periodically)
+                  - Log Entry: Sent when a new log is submitted via `/logs/submit`. The structure matches the `LogEntry` schema (without _id).
+                    ```json
+                    {
+                      "message": "User logged in",
+                      "level": "info",
+                      "source": "auth",
+                      "timestamp": "2023-10-27T10:05:00.000Z"
+                    }
+                    ```
+        '500':
+          description: Server error establishing SSE stream.
+
+  /logs/submit:
+    post:
+      tags:
+        - Logs
+      summary: Submit a New Log Entry
+      description: Submits a new log entry, stores it in the database, and broadcasts it via SSE to connected log stream clients.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LogSubmit'
+      responses:
+        '200': # Note: Code returns 200, not 201
+          description: Log submitted successfully.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+        '400':
+          description: Missing required 'message' field.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Failed to submit log.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /services/generate_table:
+    get:
+      tags:
+        - Services
+      summary: Generate Report Table
+      description: Forwards a request to an external report generation service and returns the generated file (CSV or XLSX).
+      parameters:
+        - name: chat_id
+          in: query
+          required: true
+          description: The chat ID for which to generate the report.
+          schema:
+            type: string
+        - name: format
+          in: query
+          required: false
+          description: The desired output format ('csv' or 'xlsx'). Defaults to 'csv'.
+          schema:
+            type: string
+            enum: [csv, xlsx]
+            default: csv
+      responses:
+        '200':
+          description: Report file generated successfully.
+          content:
+            text/csv:
+              schema:
+                type: string
+                format: binary
+              
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+        '400':
+          description: Missing required 'chat_id' parameter.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error or error from the report generation service.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        # Other potential status codes forwarded from the target service (e.g., 404, 502)
+
+  /settings/llms:
+    get:
+      tags:
+        - Settings
+      summary: Get LLMs List
+      description: Retrieves the list of configured Large Language Models (LLMs).
+      responses:
+        '200':
+          description: List of LLMs.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  llms:
+                    type: array
+                    items:
+                      type: string
+                    example: ["gpt-3.5-turbo", "gpt-4"]
+        '500':
+          description: Failed to get LLMs list.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    post:
+      tags:
+        - Settings
+      summary: Update LLMs List
+      description: Updates or creates the list of available LLMs.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - llms
+              properties:
+                llms:
+                  type: array
+                  items:
+                    type: string
+                  description: The list of LLM identifiers.
+                  example: ["gpt-4", "claude-2"]
+      responses:
+        '200':
+          description: LLMs list updated successfully.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+        '400':
+          description: Invalid request body format (not an array or contains non-strings).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Failed to update LLMs list.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /settings/llm_endpoint:
+    get:
+      tags:
+        - Settings
+      summary: Get LLM Endpoint URL
+      description: Retrieves the configured endpoint URL for the LLM service.
+      responses:
+        '200':
+          description: The configured LLM endpoint URL.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  llm_endpoint:
+                    type: string
+                    format: url
+                    example: "http://localhost:5000/invoke"
+        '500':
+          description: Failed to get LLM endpoint.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    post:
+      tags:
+        - Settings
+      summary: Update LLM Endpoint URL
+      description: Updates or creates the endpoint URL for the LLM service.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - url
+              properties:
+                url:
+                  type: string
+                  format: url
+                  description: The new URL for the LLM endpoint.
+                  example: "https://api.example-llm.com/v1/chat"
+      responses:
+        '200':
+          description: LLM endpoint updated successfully.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+        '400':
+          description: Invalid or missing URL in the request body.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Failed to update LLM endpoint.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /settings/vlms:
+    get:
+      tags:
+        - Settings
+      summary: Get VLMs List
+      description: Retrieves the list of configured Vision Language Models (VLMs).
+      responses:
+        '200':
+          description: List of VLMs.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  vlms:
+                    type: array
+                    items:
+                      type: string
+                    example: ["gpt-4-vision", "llava"]
+        '500':
+          description: Failed to get VLMs list.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    post:
+      tags:
+        - Settings
+      summary: Update VLMs List
+      description: Updates or creates the list of available VLMs.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - vlms
+              properties:
+                vlms:
+                  type: array
+                  items:
+                    type: string
+                  description: The list of VLM identifiers.
+                  example: ["gpt-4-vision-preview", "bakllava"]
+      responses:
+        '200':
+          description: VLMs list updated successfully.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+        '400':
+          description: Invalid request body format (not an array or contains non-strings).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Failed to update VLMs list.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /settings/whatsapp_qr:
+    get:
+      tags:
+        - Settings
+      summary: Get WhatsApp QR Code
+      description: Retrieves the currently stored WhatsApp QR code string (likely base64 encoded image data).
+      responses:
+        '200':
+          description: Successfully retrieved the QR code.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      qr_code:
+                        type: string
+                        description: The stored QR code data.
+                        example: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAA..."
+        '404':
+          description: WhatsApp QR code setting not found in the database.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  message:
+                    type: string
+                    example: "WhatsApp QR code not found"
+        '500':
+          description: Failed to retrieve QR code.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  message:
+                    type: string
+                    example: "Failed to retrieve QR code"
+    post:
+      tags:
+        - Settings
+      summary: Save WhatsApp QR Code
+      description: Saves or updates the WhatsApp QR code string in the settings.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - qr_code
+              properties:
+                qr_code:
+                  type: string
+                  description: The QR code data string (e.g., base64 encoded image).
+                  example: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAA..."
+      responses:
+        '200': # Note: Code returns 200
+          description: QR code saved successfully.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "WhatsApp QR code saved successfully"
+        '400':
+          description: Missing 'qr_code' field in the request body.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  message:
+                    type: string
+                    example: "QR code is required"
+        '500':
+          description: Failed to save QR code.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  message:
+                    type: string
+                    example: "Failed to save QR code"
+
+  /users:
+    get:
+      tags:
+        - Users
+      summary: Get All Users
+      description: Retrieves a list of all registered users, excluding their passwords.
+      responses:
+        '200':
+          description: A list of users.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/User'
+        '500':
+          description: Internal server error fetching users.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    post:
+      tags:
+        - Users
+      summary: Create New User
+      description: Registers a new user with username, password, name, and role.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserCreate'
+      responses:
+        '201':
+          description: User created successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User' # Returns created user info (minus password)
+        '400':
+          description: Missing required fields.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Username already exists.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error creating user.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    delete:
+      tags:
+        - Users
+      summary: Delete User
+      description: Deletes a user by their ID.
+      parameters:
+        - name: id
+          in: query
+          required: true
+          description: The MongoDB ObjectId of the user to delete.
+          schema:
+            type: string
+            format: objectid # Custom format hint
+            example: "60d..."
+      responses:
+        '200':
+          description: User deleted successfully.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "User deleted successfully"
+        '400':
+          description: User ID is required or invalid format.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: User not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error deleting user.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /users/auth:
+    post:
+      tags:
+        - Users
+      summary: Authenticate User
+      description: Authenticates a user based on username and password.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserAuthRequest'
+      responses:
+        '200':
+          description: Authentication successful. Returns user information.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserAuthResponse'
+        '400':
+          description: Missing username or password.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Invalid username or password.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error during authentication.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /users/{id}:
+    get:
+      tags:
+        - Users
+      summary: Get User by ID
+      description: Retrieves details for a specific user by their ID, excluding the password.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: The MongoDB ObjectId of the user.
+          schema:
+            type: string
+            format: objectid
+            example: "60d..."
+      responses:
+        '200':
+          description: User details found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          description: User ID is required or invalid format.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: User not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error fetching user.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    patch:
+      tags:
+        - Users
+      summary: Update User Details
+      description: Updates a user's name and/or password.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: The MongoDB ObjectId of the user to update.
+          schema:
+            type: string
+            format: objectid
+            example: "60d..."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserUpdate'
+      responses:
+        '200':
+          description: User updated successfully.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "User updated successfully"
+        '400':
+          description: User ID is required, invalid format, or missing fields to update (name or password).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: User not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error updating user.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          description: A description of the error.
+          example: "Missing required parameter: source_name"
+
+    ChatSummary:
+      type: object
+      properties:
+        chat_id:
+          type: string
+          description: Unique identifier for the chat within its source.
+          example: "1234567890@c.us"
+        chat_name:
+          type: string
+          description: Display name of the chat.
+          example: "Support Group"
+        active:
+          type: boolean
+          description: Whether the chat is currently active.
+          example: true
+        source_name:
+          type: string
+          description: The source platform (e.g., 'whatsapp').
+          example: "whatsapp"
+
+    ChatCreate:
+      type: object
+      required:
+        - chat_id
+        - chat_name
+        - source_name
+      properties:
+        chat_id:
+          type: string
+          description: Unique identifier for the chat within its source.
+          example: "9876543210@c.us"
+        chat_name:
+          type: string
+          description: Display name for the new chat.
+          example: "New Inquiry"
+        source_name:
+          type: string
+          description: The source platform (e.g., 'telegram').
+          example: "telegram"
+
+    ChatUpdate:
+      type: object
+      required:
+        - source_name
+        - active
+      properties:
+        source_name:
+          type: string
+          description: The source platform of the chat being updated.
+          example: "whatsapp"
+        active:
+          type: boolean
+          description: The new active status for the chat.
+          example: false
+
+    Message:
+      type: object
+      properties:
+        _id:
+          type: string
+          format: objectid
+          description: MongoDB document ID.
+          example: "60d..."
+        message_id:
+          type: string
+          description: Unique identifier for the message within its source.
+          example: "msg_abc123"
+        source_name:
+          type: string
+          description: The source platform (e.g., 'whatsapp').
+          example: "whatsapp"
+        chat_id:
+          type: string
+          description: Identifier of the chat this message belongs to.
+          example: "1234567890@c.us"
+        text:
+          type: string
+          description: The text content of the message.
+          example: "Hello, I need help."
+        sender_id:
+          type: string
+          description: Identifier of the message sender.
+          nullable: true
+          example: "user456"
+        sender_name:
+          type: string
+          description: Display name of the message sender.
+          example: "Alice"
+        image:
+          type: string # Assuming image data might be stored as base64 or a URL
+          description: Image data or URL associated with the message.
+          nullable: true
+          example: null
+        data:
+          type: object # Or could be string, depending on usage
+          description: Additional arbitrary data associated with the message.
+          nullable: true
+          example: null
+        timestamp:
+          type: string
+          format: date-time
+          description: Original timestamp of the message creation.
+          example: "2023-10-27T10:01:00.000Z"
+        updated_at:
+          type: string
+          format: date-time
+          description: Timestamp of the last update in the system.
+          example: "2023-10-27T10:01:05.000Z"
+
+    NewMessage:
+      type: object
+      required:
+        - message_id
+        - source_name
+        - chat_id
+        - text
+        - sender_name
+      properties:
+        message_id:
+          type: string
+          description: Unique identifier for the message within its source.
+          example: "msg_def456"
+        source_name:
+          type: string
+          description: The source platform (e.g., 'telegram').
+          example: "telegram"
+        chat_id:
+          type: string
+          description: Identifier of the chat this message belongs to.
+          example: "chat789"
+        text:
+          type: string
+          description: The text content of the message.
+          example: "Is this service available?"
+        sender_id:
+          type: string
+          description: Identifier of the message sender (optional).
+          nullable: true
+          example: "user789"
+        sender_name:
+          type: string
+          description: Display name of the message sender.
+          example: "Bob"
+        image:
+          type: string
+          description: Image data or URL (optional).
+          nullable: true
+          example: null
+        data:
+          type: object # Or string
+          description: Additional arbitrary data (optional).
+          nullable: true
+          example: {"reply_to": "msg_abc123"}
+
+    LogEntry:
+      type: object
+      properties:
+        _id:
+          type: string
+          format: objectid
+          description: MongoDB document ID.
+          example: "60d..."
+        message:
+          type: string
+          description: The log message content.
+          example: "User login successful"
+        level:
+          type: string
+          description: Log level (e.g., 'info', 'warn', 'error').
+          example: "info"
+        source:
+          type: string
+          description: Source of the log entry (e.g., 'app', 'auth').
+          example: "auth"
+        timestamp:
+          type: string
+          format: date-time
+          description: Timestamp when the log entry was created.
+          example: "2023-10-27T10:05:00.000Z"
+
+    LogSubmit:
+      type: object
+      required:
+        - message
+      properties:
+        message:
+          type: string
+          description: The log message content.
+          example: "Settings updated"
+        level:
+          type: string
+          description: Log level (defaults to 'info').
+          example: "info"
+          default: "info"
+        source:
+          type: string
+          description: Source of the log entry (defaults to 'app').
+          example: "settings"
+          default: "app"
+
+    User:
+      type: object
+      properties:
+        _id:
+          type: string
+          format: objectid
+          description: MongoDB document ID.
+          example: "60d..."
+        id: # Often added in responses for convenience
+          type: string
+          description: String representation of MongoDB document ID.
+          example: "60d..."
+        username:
+          type: string
+          description: Unique username for login.
+          example: "admin"
+        name:
+          type: string
+          description: User's full name or display name.
+          example: "Administrator"
+        role:
+          type: string
+          description: User role (e.g., 'admin', 'editor').
+          example: "admin"
+        createdAt:
+          type: string
+          format: date-time
+          description: Timestamp of user creation.
+          example: "2023-10-26T12:00:00.000Z"
+        updatedAt:
+          type: string
+          format: date-time
+          description: Timestamp of last user update.
+          example: "2023-10-27T09:30:00.000Z"
+
+    UserCreate:
+      type: object
+      required:
+        - username
+        - password
+        - name
+        - role
+      properties:
+        username:
+          type: string
+          example: "newuser"
+        password:
+          type: string
+          format: password
+          description: User's password (will be hashed).
+          example: "s3cr3tP@ssw0rd"
+        name:
+          type: string
+          example: "New User"
+        role:
+          type: string
+          example: "editor"
+
+    UserUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+          description: New name for the user (optional).
+          example: "Updated Name"
+        password:
+          type: string
+          format: password
+          description: New password for the user (optional, will be hashed).
+          example: "n3wP@ssw0rd!"
+      minProperties: 1 # At least one field must be provided
+
+    UserAuthRequest:
+      type: object
+      required:
+        - username
+        - password
+      properties:
+        username:
+          type: string
+          example: "admin"
+        password:
+          type: string
+          format: password
+          example: "s3cr3tP@ssw0rd"
+
+    UserAuthResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          description: User's unique ID (string representation of ObjectId).
+          example: "60d..."
+        name:
+          type: string
+          example: "Administrator"
+        username:
+          type: string
+          example: "admin"
+        role:
+          type: string
+          example: "admin"
+
+  # securitySchemes: # Placeholder - Actual scheme depends on NextAuth config
+  #   cookieAuth:
+  #     type: apiKey
+  #     in: cookie
+  #     name: next-auth.session-token # Or whatever cookie name NextAuth uses
+  #   bearerAuth:
+  #     type: http
+  #     scheme: bearer
+  #     bearerFormat: JWT
+
+# security: # Placeholder - Apply globally if most endpoints require auth
+#   - cookieAuth: []
+#   - bearerAuth: []

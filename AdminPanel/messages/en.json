@@ -1,0 +1,537 @@
+{
+  "common": {
+    "appName": "qwerty",
+    "version": "qwerty v1.0.0 © 2025",
+    "subtitle": "Agricultural Management"
+  },
+  "navigation": {
+    "dashboard": "Statistics",
+    "llmConfig": "LLM Configuration",
+    "chatIntegration": "Chat Integration",
+    "reportsExcel": "Reports & Excel",
+    "cloudStorage": "Cloud Storage",
+    "bertClassifier": "BERT Classifier",
+    "taskTiming": "Task Timing",
+    "logs": "Logs",
+    "userManagement": "User Management",
+    "settings": "Settings",
+    "api": "API",
+    "users": "Users",
+    "reports": "Reports",
+    "templates": "Templates"
+  },
+  "userMenu": {
+    "profile": "Profile",
+    "settings": "Settings",
+    "logout": "Logout"
+  },
+  "dashboard": {
+    "charts": {
+      "operationsByArea": "Operations by Area",
+      "culturesByArea": "Cultures by Area",
+      "dailyProgress": "Daily Progress (ha)",
+      "totalProgress": "Total Progress by Operation (ha)",
+      "noChatSelected": "No chat selected for dashboard charts. Please configure it in settings."
+    },
+    "errors": {
+      "fetchFailed": "Failed to fetch settings",
+      "chartsLoadFailed": "Failed to load charts"
+    },
+    "stats": {
+      "tasksProcessedToday": "Tasks Processed Today",
+      "moreFromYesterday": "12% more than yesterday",
+      "processingQueue": "Processing Queue",
+      "awaitingProcessing": "Awaiting processing",
+      "apiCallsToday": "API Calls Today",
+      "llmCalls": "LLM calls",
+      "successRate": "Success Rate",
+      "increaseRate": "2% increase from last week"
+    }
+  },
+  "systemNotice": {
+    "title": "System Notice",
+    "maintenance": "Planned maintenance: March 31, 22:00-23:00"
+  },
+  "meta": {
+    "title": "qwerty - Agricultural Management",
+    "description": "qwerty agrocultural management is a comprehensive agricultural management system for agronomists and farmers. Manage tasks, analyze crops, test soil, identify pests, and more.",
+    "keywords": "qwerty, agricultural management, agronomist, farming, crop analysis, soil testing, pest identification, irrigation analysis"
+  },
+  "settingsPanel": {
+    "title": "Settings",
+    "apiConfigTitle": "API Configuration",
+    "apiUrlLabel": "API Endpoint URL",
+    "apiUrlPlaceholder": "Enter API endpoint URL",
+    "saving": "Saving...",
+    "save": "Save",
+    "fetchError": "Failed to fetch settings",
+    "updateError": "Failed to update settings",
+    "updateSuccess": "Settings updated successfully",
+    "whatsappQrTitle": "WhatsApp QR Code",
+    "lastQrCodeLabel": "Last available QR code:",
+    "qrCodeInfo": "Scan this code with WhatsApp to connect to the system",
+    "noQrCode": "No WhatsApp QR code available. It will appear here when generated.",
+    "qrCodeFetchError": "Failed to fetch QR code",
+    "dashboardChartsTitle": "Dashboard Charts",
+    "sourceLabel": "Data Source",
+    "chatLabel": "Chat for Dashboard Charts",
+    "selectChat": "Select a chat",
+    "chatHelp": "Select the chat containing agricultural data for dashboard charts",
+    "saveDashboardChat": "Save Dashboard Chat",
+    "dashboardChatUpdateSuccess": "Dashboard chat updated successfully",
+    "reportSettingsTitle": "Report Schedules",
+    "addNewSetting": "Add New",
+    "showDeletedSettings": "Show deleted settings",
+    "noSettings": "No report schedules found",
+    "name": "Name",
+    "description": "Description",
+    "schedule": "Schedule",
+    "type": "Type",
+    "actions": "Actions",
+    "editSetting": "Edit Report Schedule",
+    "format": "Report Format",
+    "cronSchedule": "Schedule (Cron Format)",
+    "minute": "Minute",
+    "hour": "Hour",
+    "dayOfMonth": "Day (Month)",
+    "month": "Month",
+    "dayOfWeek": "Day (Week)",
+    "recipients": "Recipients",
+    "phoneNumber": "Phone Number",
+    "platform": "Platform",
+    "remove": "Remove",
+    "addRecipient": "Add Recipient",
+    "cancel": "Cancel",
+    "create": "Create",
+    "update": "Update",
+    "cloudStorageTitle": "Cloud Storage",
+    "yandexDiskTitle": "Yandex Disk",
+    "token": "OAuth Token",
+    "folderName": "Shared Folder Name",
+    "noYandexConfig": "No Yandex Disk configuration found.",
+    "configure": "Configure",
+    "edit": "Edit",
+    "googleDriveTitle": "Google Drive",
+    "serviceAccount": "Service Account JSON",
+    "noGoogleConfig": "No Google Drive configuration found.",
+    "associatedChats": "Associated Chats",
+    "noChatsAvailable": "No chats available",
+    "chatsSelected": "{count} chats selected",
+    "clearAll": "Clear All"
+  },
+  "modelsPanel": {
+    "title": "🤖 Models Management",
+    "workersTitle": "🖥️ Connected Workers",
+    "llmSelectionTitle": "📝 Text Models (LLM) Selection",
+    "vlmSelectionTitle": "🖼️ Vision Models (VLM) Selection",
+    "noWorkersFound": "No workers connected to the system",
+    "connected": "Online",
+    "disconnected": "Offline",
+    "hotModels": "🔥Hot Models",
+    "coldModels": "❄️ Cold Models",
+    "noHotModels": "No active models",
+    "noColdModels": "No available models",
+    "selectedLLMs": "Selected Text Models",
+    "selectedVLMs": "Selected Vision Models",
+    "availableLLMs": "Available Text Models",
+    "availableVLMs": "Available Vision Models",
+    "noModelsSelected": "No models selected",
+    "noAvailableModels": "All models already selected",
+    "fetchError": "Failed to fetch data",
+    "updateError": "Failed to update configuration",
+    "workersError": "Failed to fetch workers data",
+    "llmUpdateSuccess": "✅ Text models list updated successfully",
+    "vlmUpdateSuccess": "✅ Vision models list updated successfully",
+    "apiName": "Internal Name",
+    "backend": "Backend",
+    "quant": "Quantization",
+    "wrapper": "Wrapper",
+    "contextLength": "Context Length",
+    "parallelRequests": "Parallel Requests",
+    "performanceMetrics": "Performance Metrics",
+    "tasksProcessed": "Tasks Processed",
+    "cpuUsage": "CPU Usage",
+    "ramUsage": "RAM Usage",
+    "gpuUsage": "GPU Usage",
+    "vramUsage": "VRAM Usage"
+  },
+  "chatPanel": {
+    "processingReport": "Processing report",
+    "reportProcessedEmpty": "No data to display",
+    "processingError": "Processing Error",
+    "unknownError": "Unknown error",
+    "additionalData": "Additional Data",
+    "sseErrorPrefix": "Connection error",
+    "errorLoadingMessages": "Error loading messages",
+    "selectChatsToView": "Select chats to view messages",
+    "noMessages": "No messages available for selected chats",
+    "unknownSender": "Unknown Sender",
+    "unknownChat": "Unknown Chat",
+    "sseConnectionError": "Connection to message stream failed",
+    "chatStatusUpdated": "Chat status updated successfully",
+    "chatViewer": "Chat Viewer",
+    "selectDataSource": "Select Data Sources",
+    "deselectAll": "Deselect All",
+    "selectAll": "Select All",
+    "noDataSources": "No data sources available",
+    "selectChat": "Select Active Chats",
+    "selectDataSourceFirst": "Select a data source first",
+    "noActiveChats": "No active chats available",
+    "unnamed": "Unnamed Chat",
+    "chatConfiguration": "Chat Configuration",
+    "configureDataSource": "Configure Data Source",
+    "selectSourcePrompt": "Select a data source to configure",
+    "availableChats": "Available Chats",
+    "noSourceSelected": "No source selected",
+    "selectSourceToConfigure": "Select a data source to configure chats",
+    "noChatsAvailableForSource": "No chats available for this data source"
+  },
+  "landing": {
+    "nav": {
+      "features": "Features",
+      "howItWorks": "How It Works",
+      "testimonials": "Testimonials",
+      "pricing": "Pricing",
+      "contact": "Contact",
+      "signIn": "Sign In"
+    },
+    "hero": {
+      "title": {
+        "firstPart": "Transform Agricultural Chats into",
+        "highlight": "Actionable Reports"
+      },
+      "description": "Our AI-powered platform automatically extracts valuable insights from agricultural chat discussions, helping you make data-driven decisions without manual analysis.",
+      "primaryCta": "Sign In",
+      "secondaryCta": "Learn More",
+      "chatDemo": {
+        "message1": "The soil moisture levels are below average this season.",
+        "message2": "We should adjust irrigation schedules accordingly.",
+        "message3": "Drone images show potential pest issues in sector 5.",
+        "processing": "AI Processing",
+        "result": "Report generated: Irrigation needs increased by 15%"
+      }
+    },
+    "features": {
+      "title": "Unlock the Power of Conversation",
+      "cards": {
+        "analysis": {
+          "title": "AI-Powered Analysis",
+          "description": "Our intelligent system captures and analyzes agricultural chat conversations automatically."
+        },
+        "insights": {
+          "title": "Actionable Insights",
+          "description": "Convert casual discussions into structured data for better decision making."
+        },
+        "reporting": {
+          "title": "Automated Reporting",
+          "description": "Generate professional reports with key findings and recommendations instantly."
+        }
+      }
+    },
+    "howItWorks": {
+      "title": "How QwertyAI Works",
+      "steps": {
+        "connect": {
+          "title": "Connect Your Chats",
+          "description": "Integrate with popular messaging platforms or use our custom chat solution."
+        },
+        "conversations": {
+          "title": "Have Conversations",
+          "description": "Discuss agricultural topics naturally with your team or experts."
+        },
+        "ai": {
+          "title": "AI Analysis",
+          "description": "Our AI extracts key data points, trends, and actionable information."
+        },
+        "reports": {
+          "title": "Get Reports",
+          "description": "Receive automated reports with insights organized by categories."
+        }
+      }
+    },
+    "stats": {
+      "users": {
+        "title": "Active Users",
+        "description": "Trusted by farmers worldwide"
+      },
+      "conversations": {
+        "title": "Conversations Analyzed",
+        "description": "Since our launch in 2023"
+      },
+      "countries": {
+        "title": "Countries",
+        "description": "Global agricultural coverage"
+      }
+    },
+    "testimonials": {
+      "title": "What Our Users Say",
+      "cards": {
+        "first": {
+          "name": "John Smith",
+          "role": "Farm Manager, USA",
+          "quote": "QwertyAI has transformed how we handle agricultural data. What used to take hours of meetings and notes now happens automatically."
+        },
+        "second": {
+          "name": "Maria Rodriguez",
+          "role": "Agricultural Consultant",
+          "quote": "The insights generated from our casual discussions have proven invaluable for optimizing crop yields for our clients."
+        },
+        "third": {
+          "name": "Alex Tanner",
+          "role": "Cooperative Director",
+          "quote": "Implementing QwertyAI across our cooperative has standardized our reporting and improved decision-making for all members."
+        }
+      }
+    },
+    "pricing": {
+      "title": "Simple, Transparent Pricing",
+      "subtitle": "Choose the plan that fits your agricultural operation",
+      "popular": "MOST POPULAR",
+      "choosePlan": "Choose Plan",
+      "contact": "Contact Sales",
+      "plans": {
+        "starter": {
+          "name": "Starter",
+          "price": "$29",
+          "features": {
+            "f1": "Up to 5 users",
+            "f2": "1,000 messages per month",
+            "f3": "Basic reporting",
+            "f4": "Email support"
+          }
+        },
+        "pro": {
+          "name": "Professional",
+          "price": "$79",
+          "features": {
+            "f1": "Up to 20 users",
+            "f2": "10,000 messages per month",
+            "f3": "Advanced analytics",
+            "f4": "Priority support",
+            "f5": "Custom report templates"
+          }
+        },
+        "enterprise": {
+          "name": "Enterprise",
+          "price": "Custom",
+          "features": {
+            "f1": "Unlimited users",
+            "f2": "Unlimited messages",
+            "f3": "Full API access",
+            "f4": "Dedicated support manager",
+            "f5": "Custom integrations"
+          }
+        }
+      }
+    },
+    "contact": {
+      "title": "Get In Touch",
+      "getInTouch": "Contact Us",
+      "description": "Have questions about QwertyAI? Our team is here to help you transform your agricultural communications into actionable intelligence.",
+      "form": {
+        "name": "Name",
+        "namePlaceholder": "Enter your name",
+        "email": "Email",
+        "emailPlaceholder": "Enter your email",
+        "message": "Message",
+        "messagePlaceholder": "How can we help you?",
+        "submit": "Send Message"
+      }
+    },
+    "cta": {
+      "title": "Ready to Streamline Your Agricultural Data?",
+      "description": "Join farmers and agricultural professionals who are saving hours each week with automated chat analysis.",
+      "button": "Sign In to Get Started"
+    },
+    "footer": {
+      "copyright": "© {year} QwertyAI. All rights reserved.",
+      "product": "Product",
+      "company": "Company",
+      "legal": "Legal",
+      "links": {
+        "features": "Features",
+        "pricing": "Pricing",
+        "faq": "FAQ",
+        "about": "About Us",
+        "contact": "Contact",
+        "jobs": "Careers",
+        "terms": "Terms of Use",
+        "privacy": "Privacy Policy",
+        "cookies": "Cookie Policy"
+      }
+    }
+  },
+  "signin": {
+    "welcomeBack": "Welcome Back",
+    "signInContinue": "Sign in to continue to your account",
+    "username": "Username",
+    "usernamePlaceholder": "Enter your username",
+    "password": "Password",
+    "passwordPlaceholder": "Enter your password",
+    "signIn": "Sign In",
+    "signingIn": "Signing in...",
+    "invalidCredentials": "Invalid username or password",
+    "errorMessage": "Something went wrong. Please try again."
+  },
+  "users": {
+    "loading": "Loading...",
+    "accessDeniedTitle": "Access Denied",
+    "accessDeniedMessage": "Please sign in to view the Users Panel.",
+    "errorPrefix": "Error: ",
+    "errorFetchTeam": "Failed to fetch your team information.",
+    "errorNoTeamAssigned": "You are not currently assigned to any team.",
+    "errorFetchMembers": "Failed to fetch team members.",
+    "errorGenericFetch": "Error fetching team details.",
+    "errorCreateUser": "Failed to create user.",
+    "errorAddUserToTeam": "Failed to add user to the team. User creation rolled back.",
+    "errorDeleteUserAccount": "Failed to delete the user account.",
+    "errorGenericAction": "An error occurred while processing your request.",
+    "errorCouldNotDetermineTeam": "Could not determine your team.",
+    "title": "Team Users: {teamName}",
+    "viewOnlyMessage": "You have view-only access for this team.",
+    "table": {
+      "username": "Username",
+      "name": "Name",
+      "role": "Role",
+      "actions": "Actions",
+      "roleAdmin": "Admin",
+      "roleUser": "User",
+      "roleNA": "N/A",
+      "currentUser": "Current User",
+      "noUsers": "No users found in this team.",
+      "adminUser": "Admin User"
+    },
+    "buttons": {
+      "addUser": "Add New User",
+      "saveUser": "Save User",
+      "cancel": "Cancel",
+      "deleteUserAriaLabel": "Delete user {username}"
+    },
+    "addUserForm": {
+      "title": "Add New User to Team",
+      "usernameLabel": "Username",
+      "usernamePlaceholder": "e.g., jdoe",
+      "nameLabel": "Full Name",
+      "namePlaceholder": "e.g., John Doe",
+      "passwordLabel": "Password",
+      "passwordPlaceholder": "Min 8 characters",
+      "roleLabel": "Role",
+      "roleUser": "User",
+      "roleAdmin": "Administrator"
+    },
+    "deleteConfirm": "Are you sure you want to remove this user from the team and delete their account?"
+  },
+  "profile": {
+    "title": "Profile Settings",
+    "currentNameLabel": "Current Name",
+    "nameLabel": "Name",
+    "namePlaceholder": "Enter your new name",
+    "passwordLabel": "New Password",
+    "passwordPlaceholder": "Leave blank to keep current password",
+    "confirmPasswordLabel": "Confirm New Password",
+    "confirmPasswordPlaceholder": "Confirm your new password",
+    "updateButton": "Update Profile",
+    "updatingButton": "Updating...",
+    "errorPasswordMismatch": "Passwords do not match.",
+    "errorUpdateFailed": "Failed to update profile. Please try again.",
+    "errorMissingUserId": "User session not found. Please log in again.",
+    "successUpdate": "Profile updated successfully!",
+    "loadingUser": "Loading user data...",
+    "sessionError": "Could not load user session."
+  },
+  "reports": {
+    "chatSelection": {
+      "label": "Select an Active Chat",
+      "placeholder": "Select a chat",
+      "loading": "Loading chats...",
+      "noChats": "No active chats found"
+    },
+    "dateRange": {
+      "startDate": "Start Date",
+      "endDate": "End Date"
+    },
+    "buttons": {
+      "generateReport": "Generate Report",
+      "generating": "Generating...",
+      "downloadCsv": "Download CSV",
+      "downloadXlsx": "Download XLSX",
+      "downloading": "Downloading..."
+    },
+    "errors": {
+      "prefix": "Error",
+      "unknown": "An unknown error occurred while fetching chats.",
+      "whatsappFetch": "Failed to fetch WhatsApp chats (status: {status})",
+      "telegramFetch": "Failed to fetch Telegram chats (status: {status})",
+      "reportGeneration": "Failed to generate report (status: {status})",
+      "reportGenerationWithDetails": "Failed to generate report: {details}",
+      "reportGenerationUnknown": "An unknown error occurred while generating the report.",
+      "csvParse": "Failed to parse CSV report. {details}",
+      "csvParseDetailed": "Failed to parse CSV report: {details}",
+      "downloadFailed": "Failed to download report (status: {status})",
+      "downloadFailedDetails": "Failed to download report: {details}",
+      "downloadUnknown": "An unknown error occurred while downloading the {format} report."
+    },
+    "report": {
+      "title": "Report Preview",
+      "generating": "Generating report preview..."
+    }
+  },
+  "templates": {
+    "selectTemplate": "Select Template",
+    "loading": "Loading...",
+    "selectOrCreate": "-- Select or Create --",
+    "createNewTemplate": "[ Create New Template ]",
+    "error": "Error",
+    "loadingTemplateDetails": "Loading template details...",
+    "templateName": "Template Name",
+    "enterTemplateName": "Enter template name",
+    "tableColumns": "Table Columns",
+    "columnPlaceholder": "Column {number} name",
+    "addAtLeastOneColumn": "Add at least one column.",
+    "newColumnName": "New column name",
+    "addColumn": "Add Column",
+    "taskSplitPrompt": "Task Split Prompt",
+    "taskSplitInstructions": "Instructions for breaking down tasks",
+    "enterTaskSplitPrompt": "Enter the prompt used to split tasks based on the columns...",
+    "systemPrompt": "System Prompt",
+    "systemPromptInstructions": "Overall instructions for the AI",
+    "enterSystemPrompt": "Enter the main system prompt or instructions for the AI processing this template...",
+    "associatedChats": "Associated Chats",
+    "selectChatsForTemplate": "Select chats that will use this template",
+    "loadingChats": "Loading chats...",
+    "noChats": "No chats available to associate with this template.",
+    "chats": "chats",
+    "noChatsForSource": "No chats available for this source.",
+    "inactive": "Inactive",
+    "chatsSelected": "{count} chats selected",
+    "clearAll": "Clear All",
+    "createTemplate": "Create Template",
+    "saveChanges": "Save Changes",
+    "deleteTemplate": "Delete Template",
+    "selectTemplateMessage": "Select a template from the dropdown above to edit it, or choose \"[ Create New Template ]\" to start a new one.",
+    "confirmDelete": "Are you sure you want to delete the template \"{name}\"? This cannot be undone.",
+    "noTemplateSelected": "No template selected to delete.",
+    "templateNameRequired": "Template name cannot be empty.",
+    "columnRequired": "Template must have at least one column.",
+    "emptyColumnsNotAllowed": "Column names cannot be empty.",
+    "columnExists": "Column \"{name}\" already exists.",
+    "columnNameEmpty": "Column name cannot be empty.",
+    "removeColumn": "Remove column: {name}"
+  },
+  "LogPanel": {
+    "title": "System Logs",
+    "status": "Status",
+    "connected": "Connected",
+    "disconnected": "Disconnected",
+    "noLogs": "No logs available",
+    "invalidDate": "Invalid Date",
+    "unknown": "Unknown",
+    "na": "N/A",
+    "level": {
+      "error": "Error",
+      "warn": "Warning",
+      "info": "Info",
+      "debug": "Debug"
+    }
+  }
+}
