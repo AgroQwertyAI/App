@@ -310,13 +310,13 @@ async def save_google_drive_report(setting: dict) -> str:
                             "Content-Type": "multipart/related; boundary=boundary",
                         },
                         content=(
-                            "--boundary\r\n"
-                            "Content-Type: text/plain\r\n\r\n"
-                            f'{{"name": "text.txt", "parents": ["{message_folder_id}"]}}\r\n'
-                            "--boundary\r\n"
-                            "Content-Type: text/plain\r\n\r\n"
-                            f"{message['original_message_text']}\r\n"
-                            "--boundary--"
+                            b"--boundary\r\n"
+                            b"Content-Type: application/json\r\n\r\n" +
+                            f'{{"name": "text.txt", "parents": ["{message_folder_id}"], "mimeType": "text/plain"}}\r\n'.encode('utf-8') +
+                            b"--boundary\r\n"
+                            b"Content-Type: text/plain\r\n\r\n" +
+                            message['original_message_text'].encode('utf-8') + 
+                            b"\r\n--boundary--"
                         ),
                     ))
 
@@ -327,13 +327,13 @@ async def save_google_drive_report(setting: dict) -> str:
                             "Content-Type": "multipart/related; boundary=boundary",
                         },
                         content=(
-                            "--boundary\r\n"
-                            "Content-Type: application/json\r\n\r\n"
-                            f'{{"name": "formatted_text.json", "parents": ["{message_folder_id}"]}}\r\n'
-                            "--boundary\r\n"
-                            "Content-Type: application/json\r\n\r\n"
-                            f"{message['formatted_message_text']}\r\n"
-                            "--boundary--"
+                            b"--boundary\r\n"
+                            b"Content-Type: application/json\r\n\r\n" +
+                            f'{{"name": "formatted_text.json", "parents": ["{message_folder_id}"], "mimeType": "application/json"}}\r\n'.encode('utf-8') +
+                            b"--boundary\r\n"
+                            b"Content-Type: application/json\r\n\r\n" +
+                            message['formatted_message_text'].encode('utf-8') + 
+                            b"\r\n--boundary--"
                         ),
                     ))
 
@@ -356,13 +356,13 @@ async def save_google_drive_report(setting: dict) -> str:
                                     "Content-Type": "multipart/related; boundary=boundary",
                                 },
                                 content=(
-                                    "--boundary\r\n"
-                                    "Content-Type: application/json\r\n\r\n"
-                                    f'{{"name": "{str(j)}.{image_extension}", "parents": ["{message_id_to_image_folder_id[message_folder_id]}"], "mimeType": "{mime_type}"}}\r\n'
-                                    "--boundary\r\n"
-                                    f"Content-Type: {mime_type}\r\n\r\n"
-                                    f"{image_binary}\r\n"  # Binary image data
-                                    "--boundary--"
+                                    b"--boundary\r\n"
+                                    b"Content-Type: application/json\r\n\r\n" +
+                                    f'{{"name": "{str(j)}.{image_extension}", "parents": ["{message_id_to_image_folder_id[message_folder_id]}"], "mimeType": "{mime_type}"}}\r\n'.encode('utf-8') +
+                                    b"--boundary\r\n" +
+                                    f"Content-Type: {mime_type}\r\n\r\n".encode('utf-8') +
+                                    image_binary +
+                                    b"\r\n--boundary--"
                                 ),
                             )
 
