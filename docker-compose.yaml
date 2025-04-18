@@ -65,6 +65,60 @@ services:
     networks:
       - app-network
 
+  whatsapp-service:
+    build:
+      context: ./whatsapp-service
+      dockerfile: Dockerfile
+    ports:
+      - "52101:52101"
+    env_file:
+      - ./.env
+    networks:
+      - app-network
+      
+  data-service:
+    build:
+      context: ./AdminPanel
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    env_file:
+      - ./.env
+    networks:
+      - app-network
+
+  mongo-service:
+    build:
+      context: ./mongo
+      dockerfile: Dockerfile
+    ports:
+      - "27017:27017"
+    networks:
+      - app-network
+
+  presentation-service:
+    build:
+      context: ./data-presentation
+      dockerfile: Dockerfile
+    ports:
+      - "52003:52003"
+    env_file:
+      - ./.env
+    networks:
+      - app-network
+
+  classification-service:
+    build:
+      context: ./classification-service
+      dockerfile: Dockerfile
+    ports:
+      - "52004:52004"
+    env_file:
+      - ./.env
+    networks:
+      - app-network
+      
+
 networks:
   app-network:
     driver: bridge
