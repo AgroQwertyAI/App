@@ -88,10 +88,88 @@ def delete_pending_messages(setting_id: int, conn: Connection) -> bool:
 
 def convert_dataframe_to_bytes_xlsx(df: pd.DataFrame) -> bytes:
     buffer = io.BytesIO()
-    df.to_excel(buffer, index=False)
+    
+    # Use openpyxl engine for styling
+    with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
+        df.to_excel(writer, index=False)
+        
+        # Get the worksheet
+        worksheet = writer.sheets['Sheet1']
+        
+        # Import required style objects
+        from openpyxl.styles import PatternFill
+        
+        # Create fill styles
+        yellow_fill = PatternFill(start_color='FFFF00', end_color='FFFF00', fill_type='solid')
+        green_fill = PatternFill(start_color='92D050', end_color='92D050', fill_type='solid')
+        
+        # Apply green fill to header (first row)
+        for cell in worksheet[1]:
+            cell.fill = green_fill
+        
+        # Apply yellow fill to empty cells and format numerical strings
+        for row in worksheet.iter_rows(min_row=2):  # Skip header row
+            for cell in row:
+                if isinstance(cell.value, str):
+                    cell_value = cell.value.strip()
+                    if cell_value.isdigit():
+                        try:
+                            num_value = int(cell_value)
+                            # Check if number is in millions range
+                            if num_value >= 1000000:
+                                # Format for millions: maintain thousands separators without suffix
+                                cell.number_format = '# ### ### ##0'
+                            else:
+                                # Regular integer format with space as thousands separator
+                                cell.number_format = '# ##0'
+                            cell.value = num_value
+                        except ValueError:
+                            pass
+                    elif is_float_string(cell_value):
+                        try:
+                            num_value = float(cell_value)
+                            # Check if float is in millions range
+                            if num_value >= 1000000:
+                                # Format for millions: maintain thousands separators without suffix
+                                cell.number_format = '# ### ### ##0.00'
+                            else:
+                                # Regular float format with space as thousands separator
+                                cell.number_format = '# ##0.00'
+                            cell.value = num_value
+                        except ValueError:
+                            pass
+        
+        # Make all columns wider
+        for column in worksheet.columns:
+            column_letter = column[0].column_letter
+            max_length = 0
+            for cell in column:
+                try:
+                    if cell.value:
+                        cell_length = len(str(cell.value))
+                        if cell_length > max_length:
+                            max_length = cell_length
+                except:
+                    pass
+            
+            # Add some padding to the maximum length and set the column width
+            # Use proportional padding - less padding for longer content
+            adjusted_width = min(max_length + 1, max_length * 1.05)
+            worksheet.column_dimensions[column_letter].width = adjusted_width
+    
     buffer.seek(0)
     file_content = buffer.read()
     return file_content
+
+def is_float_string(s: str) -> bool:
+    """Check if string represents a valid float."""
+    try:
+        # Will fail if not a valid float format
+        float(s)
+        # Check if it contains a decimal point
+        return '.' in s
+    except ValueError:
+        return False
 
 def get_aggregated_json_from_messages(messages: list[dict]) -> dict:
     aggregated_json = {}
