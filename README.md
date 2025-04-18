@@ -64,6 +64,24 @@ npm i
 node whatsapp.js
 ```
 
+## Creating a User
+
+After starting the project, you can create a new user by sending the following API request:
+
+```bash
+curl -X POST \
+  http://localhost:3000/api/users \
+  -H "Content-Type: application/json" \
+  -d '{
+    "username": "newuser",
+    "password": "securepassword123",
+    "name": "New User",
+    "role": "admin"
+  }'
+```
+
+This will create a new admin user that can access the system.
+
 ## 🔐 Environment Variables
 
 Environment variables are loaded from the `.env` file in the root directory.
