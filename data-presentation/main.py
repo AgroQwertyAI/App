@@ -28,9 +28,7 @@ load_dotenv()
 
 # Configuration constants
 API_PORT = int(os.getenv("API_PORT", 52003))
-DATA_SERVICE_HOST = os.getenv("DATA_SERVICE_HOST", "localhost")
-DATA_SERVICE_PORT = int(os.getenv("DATA_SERVICE_PORT", 3000))
-DATA_SERVICE_URL = f"http://{DATA_SERVICE_HOST}:{DATA_SERVICE_PORT}"
+DATA_SERVICE_URL = os.getenv("DATA_SERVICE_URL", "http://data-service:3000")
 
 # FastAPI initialization
 app = FastAPI(

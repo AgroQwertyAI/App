@@ -1,5 +1,5 @@
 import aiohttp
-from src.config import MESSENGER_API_SERVICE_URL, BACKEND_SERVICE_URL, logger
+from src.config import MESSENGER_API_SERVICE_URL, DATA_SERVICE_URL, logger
 from src.schemas import MessagePayload, ChatRegistrationSchema
 import base64
 import httpx
@@ -17,7 +17,7 @@ def log_info(message: str, level: Literal['info', 'error', 'warning']):
     with httpx.Client() as client:
         try:
             client.post(
-                f"{BACKEND_SERVICE_URL}/logs",
+                f"{DATA_SERVICE_URL}/logs",
                 json=LogSchema(message=message, level=level).model_dump()
             )
         except Exception as e:
@@ -26,7 +26,7 @@ def log_info(message: str, level: Literal['info', 'error', 'warning']):
 async def register_chat(chat_registration: ChatRegistrationSchema) -> None:
     async with aiohttp.ClientSession() as session:
         async with session.post(
-            f"{BACKEND_SERVICE_URL}/api/chats", 
+            f"{DATA_SERVICE_URL}/api/chats", 
             json=chat_registration.model_dump()
         ) as response:
             if response.status != 200:
