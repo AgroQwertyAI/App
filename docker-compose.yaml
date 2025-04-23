@@ -35,20 +35,20 @@ services:
     networks:
       - app-network
 
-  telegram-bot-service:
-    build:
-      context: ./telegram-bot-service
-      dockerfile: Dockerfile
-    env_file:
-      - ./.env
-    ports:
-      - "7998:7998"
-    volumes:
-      - ./telegram-bot-service:/app
-    environment:
-      - PYTHONUNBUFFERED=1
-    networks:
-      - app-network
+ telegram-bot-service:
+   build:
+     context: ./telegram-bot-service
+     dockerfile: Dockerfile
+   env_file:
+     - ./.env
+   ports:
+     - "7998:7998"
+   volumes:
+     - ./telegram-bot-service:/app
+   environment:
+     - PYTHONUNBUFFERED=1
+   networks:
+     - app-network
 
   message-processing-service:
     build:

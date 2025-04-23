@@ -155,7 +155,7 @@ async def get_history_for_followup(table: str, assistant_message: str) -> dict:
     return payload
 
 async def extract_csv(message: str, prompt = None) -> dict:
-    inst = open('../prompt.txt', encoding='utf-8').read()
+    inst = open('prompt.txt', encoding='utf-8').read()
     
     if prompt:
         inst = prompt
