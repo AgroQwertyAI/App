@@ -32,7 +32,7 @@ async def agentic(history: list, message: str):
     else:
         payload.append({ "role": "user", "content": f"{message}" })
     
-    result = await chat("mist", payload)
+    result = await chat("yagpt", payload)
     result = result.choices[0].message.content
     
     payload.append({ "role": "assistant", "content": result })
@@ -89,7 +89,7 @@ async def split_report(message: str, prompt = None) -> list:
         "required": ["separated_reports"]
     }
     
-    result = await chat("mist", payload, structure=structure)
+    result = await chat("yagpt", payload, structure=structure)
     try:
         content = result.choices[0].message.content
         # In case LLM returns text before or after the JSON
@@ -132,7 +132,7 @@ async def determine_questions(table: str) -> dict:
         }
     ]
     
-    result = await chat("mist", payload)
+    result = await chat("yagpt", payload)
     return result.choices[0].message.content
         
 
